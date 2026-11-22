@@ -11,7 +11,7 @@ const isTouch = matchMedia('(pointer: coarse)').matches;
 const DEFAULT_URL = 'https://www.youtube.com/watch?v=PTdzL_K_ss8';
 
 const settings = Object.assign(
-  { difficulty: 'medio', mode: isTouch ? 'choice' : 'type', speed: 1, translate: true, lang: 'en' },
+  { difficulty: 'medio', mode: isTouch ? 'choice' : 'type', speed: 1, translate: true, lang: 'en', autoReplay: 8 },
   store.get('lg:settings', {})
 );
 const saveSettings = () => store.set('lg:settings', settings);
@@ -203,6 +203,7 @@ function renderReady() {
   $('#readyInfo').textContent = `${n} frases carregadas.${best ? ' Recorde: ' + best + ' pts.' : ''} O vídeo pausa no fim de cada frase com lacuna; acertou = continua, errou = volta a frase.`;
   $('#optDiff').value = settings.difficulty; $('#optMode').value = settings.mode;
   $('#optSpeed').value = String(settings.speed); $('#optLang').value = settings.lang; $('#optTr').checked = settings.translate;
+  $('#optAuto').value = String(settings.autoReplay);
   $('#lrcBox').value = toLRC(S.entries);
 }
 
@@ -329,7 +330,18 @@ function tick() {
     pauseForAnswer(); return;
   }
   if (S.waiting) {
-    if (st === YT.PlayerState.PLAYING && cur && L < cur.end - 0.4) S.waiting = false; else return;
+    if (st === YT.PlayerState.PLAYING && cur && L < cur.end - 0.4) S.waiting = false;
+    else {
+      // idle too long -> replay the passage automatically (doesn't count as a mistake)
+      const wait = settings.autoReplay * 1000;
+      if (wait && cur) {
+        const left = Math.ceil((wait - (Date.now() - S.lastActivity)) / 1000);
+        if (left <= 0) { setStatus('🔁 Ouvindo o trecho de novo…', 'info'); replayLine(); }
+        else if (left <= 3) $('#replayIn').textContent = ` (repete em ${left}s)`;
+        else $('#replayIn').textContent = '';
+      }
+      return;
+    }
   }
   let idx = -1;
   for (let i = 0; i < S.lines.length; i++) { if (S.lines[i].t <= L) idx = i; else break; }
@@ -346,8 +358,10 @@ setInterval(tick, 50);
 function pauseForAnswer() {
   player.pauseVideo();
   S.waiting = true;
+  S.lastActivity = Date.now();
   const b = activeBlank(S.lines[S.cur]);
   setStatus(b && b.attempts ? `Tente de novo (${b.attempts}/3)` : 'Qual é a palavra? 👇', 'info');
+  $('#status').insertAdjacentHTML('beforeend', '<span id="replayIn" class="muted"></span>');
   if (settings.mode === 'type') $('#answer').focus();
 }
 function replayLine() {
@@ -529,6 +543,9 @@ $('#optMode').onchange = e => { settings.mode = e.target.value; saveSettings(); 
 $('#optSpeed').onchange = e => { settings.speed = +e.target.value; saveSettings(); };
 $('#optLang').onchange = e => { settings.lang = e.target.value; saveSettings(); };
 $('#optTr').onchange = e => { settings.translate = e.target.checked; saveSettings(); };
+$('#optAuto').onchange = e => { settings.autoReplay = +e.target.value; saveSettings(); };
+// typing / tapping while waiting resets the auto-replay timer
+['input', 'pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { S.lastActivity = Date.now(); const r = $('#replayIn'); if (r) r.textContent = ''; }, true));
 $('#playBtn').onclick = startGame;
 $('#resyncBtn').onclick = () => startSync(S.entries.filter(e => e.text).map(e => e.text));
 $('#editBtn').onclick = () => $('#editBox').classList.toggle('hidden');
