@@ -4,191 +4,137 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0f1020">
+<meta name="apple-mobile-web-app-title" content="LyricGap">
+<meta name="theme-color" content="#0b0b14">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" href="icons/icon-192.png">
 <title>LyricGap</title>
-<style>
-:root{
-  --bg:#0f1020; --card:#1a1c33; --card2:#23264a; --text:#eef0ff; --muted:#9aa0c8;
-  --accent:#7c5cff; --accent2:#22d3ee; --ok:#22c55e; --bad:#ef4444; --warn:#f59e0b;
-}
-*{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
-body{padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 16px)}
-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;max-width:760px;margin:0 auto}
-header h1{font-size:20px;margin:0;letter-spacing:.5px}
-header h1 span{background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
-main{max-width:760px;margin:0 auto;padding:0 12px;display:flex;flex-direction:column;gap:12px}
-.card{background:var(--card);border-radius:16px;padding:14px}
-.card h2{margin:0 0 10px;font-size:17px}
-.hidden{display:none!important}
-.row{display:flex;gap:8px;align-items:center}
-.row > input{flex:1;min-width:0}
-input,textarea,select{font-size:16px;background:var(--card2);color:var(--text);border:1px solid #33376a;border-radius:10px;padding:10px 12px;outline:none;font-family:inherit}
-input:focus,textarea:focus{border-color:var(--accent)}
-textarea{width:100%;resize:vertical}
-button{font-size:15px;font-family:inherit;background:var(--card2);color:var(--text);border:1px solid #3a3f78;border-radius:10px;padding:10px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
-button:active{transform:scale(.97)}
-button.primary{background:linear-gradient(90deg,var(--accent),#5b8cff);border:none;font-weight:600}
-button.big{width:100%;padding:18px;font-size:20px;font-weight:700}
-button:disabled{opacity:.4}
-.muted{color:var(--muted);font-size:14px;line-height:1.4}
-label.lbl{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
-#videoWrap{position:relative;width:100%;aspect-ratio:16/9;border-radius:16px;overflow:hidden;background:#000}
-#videoWrap iframe,#player{position:absolute;inset:0;width:100%;height:100%}
-.tabs{display:flex;gap:6px;margin-bottom:10px}
-.tabs button{flex:1}
-.tabs button.active{border-color:var(--accent);background:#2d2a5e}
-.results{display:flex;flex-direction:column;gap:6px;margin-top:10px}
-.results button{text-align:left;display:flex;justify-content:space-between;gap:8px}
-.results small{color:var(--muted)}
-.saved{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-.saved button{font-size:13px;padding:6px 10px}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-.grid2 select{width:100%}
-.check{display:flex;align-items:center;gap:8px;font-size:14px}
-.check input{width:20px;height:20px}
-.btnrow{display:flex;gap:8px;flex-wrap:wrap}
-.btnrow button{flex:1}
-
-/* game */
-.hud{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--muted)}
-.hud b{color:var(--text)}
-.bar{flex:1;height:6px;background:var(--card2);border-radius:6px;overflow:hidden}
-.bar > div{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s}
-.lyrics{min-height:170px;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:12px 4px;text-align:center}
-.line{line-height:1.45;transition:all .2s}
-.line.prev,.line.next{color:var(--muted);font-size:15px;opacity:.75}
-.line.cur{font-size:23px;font-weight:600}
-.tr{font-size:14px;color:var(--accent2);font-weight:400;margin-top:4px;font-style:italic}
-.gap{display:inline-block;border-bottom:3px solid var(--muted);color:var(--warn);letter-spacing:2px;padding:0 2px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em}
-.gap.active{border-color:var(--warn);animation:pulse 1.2s infinite}
-@keyframes pulse{50%{border-color:transparent}}
-.ok{color:var(--ok)}
-.miss{color:var(--bad);text-decoration:underline}
-.flash-ok{animation:fok .6s}
-.flash-bad{animation:fbad .5s}
-@keyframes fok{30%{transform:scale(1.06);color:var(--ok)}}
-@keyframes fbad{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
-.status{text-align:center;min-height:22px;font-size:15px;margin-bottom:8px}
-.status.good{color:var(--ok)} .status.bad{color:var(--bad)} .status.info{color:var(--accent2)}
-#answer{font-size:20px;text-align:center}
-.choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.choices button{padding:16px 8px;font-size:18px;font-weight:600}
-.choices button.wrong{background:#3a1520;border-color:var(--bad);opacity:.5}
-.controls{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:10px}
-.controls button,.controls select{font-size:14px;padding:8px 10px}
-.controls .val{min-width:52px;text-align:center;font-variant-numeric:tabular-nums;font-size:14px;align-self:center}
-.syncnum{text-align:center;color:var(--muted);font-size:13px}
-
-.modal{position:fixed;inset:0;background:rgba(5,6,15,.8);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
-.modal .card{max-width:480px;width:100%;max-height:85vh;overflow:auto}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0;text-align:center}
-.stats div{background:var(--card2);border-radius:12px;padding:10px}
-.stats b{display:block;font-size:22px}
-.missed{list-style:none;padding:0;margin:0 0 12px;display:flex;flex-direction:column;gap:6px}
-.missed li{background:var(--card2);border-radius:10px;padding:8px 10px;font-size:14px}
-.missed li b{color:var(--warn)}
-.warnbox{background:#3b2a07;color:#ffd58a;border-radius:12px;padding:10px 12px;font-size:14px}
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
-<body>
-<header>
-  <h1>🎵 <span>LyricGap</span></h1>
-  <span class="muted" id="hdrInfo"></span>
-</header>
+<body data-view="home">
 
-<main>
-  <div id="fileWarn" class="warnbox hidden">Abra pelo servidor (http://…), não direto pelo arquivo — o player do YouTube não funciona em file://.</div>
+<!-- icon sprite -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-star-f" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="currentColor"/></symbol>
+    <symbol id="i-addlist" viewBox="0 0 24 24"><path d="M4 6h11M4 11h11M4 16h7M18 13v7M14.5 16.5h7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.6" height="14" rx="1.3" fill="currentColor"/><rect x="13.9" y="5" width="3.6" height="14" rx="1.3" fill="currentColor"/></symbol>
+    <symbol id="i-replay" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M4 4v4.5h4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-skip" viewBox="0 0 24 24"><path d="M5 6l9 6-9 6zM18 6v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M5 12h13M13 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.8" fill="currentColor"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><circle cx="19" cy="12" r="1.8" fill="currentColor"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
 
-  <section id="setupCard" class="card">
-    <label class="lbl" for="url">Link do YouTube</label>
-    <div class="row">
-      <input id="url" type="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off">
-      <button id="loadBtn" class="primary">Carregar</button>
+<!-- ============ HOME ============ -->
+<section id="home" class="view">
+  <div class="topbar">
+    <div class="brand">Lyric<span>Gap</span></div>
+    <button class="icon" id="btnFull" title="Tela cheia"><svg><use href="#i-expand"/></svg></button>
+    <button class="icon" id="btnSettings" title="Configurações"><svg><use href="#i-gear"/></svg></button>
+  </div>
+  <form id="searchForm" class="search" autocomplete="off">
+    <svg><use href="#i-search"/></svg>
+    <input id="q" type="search" placeholder="Buscar música ou colar link do YouTube" enterkeyhint="search" autocapitalize="off" autocorrect="off" spellcheck="false">
+  </form>
+  <div id="installHint" class="hint hidden">
+    <span>Para jogar em <b>tela cheia</b>: toque em <b>Compartilhar</b> <span class="shareico">⬆</span> e depois <b>Adicionar à Tela de Início</b>.</span>
+    <button class="icon sm" id="installClose"><svg><use href="#i-close"/></svg></button>
+  </div>
+  <nav class="seg" id="homeTabs">
+    <button data-tab="recent" class="on">Recentes</button>
+    <button data-tab="fav">Favoritos</button>
+    <button data-tab="lists">Playlists</button>
+  </nav>
+  <div id="homeList" class="list"></div>
+</section>
+
+<!-- ============ SONG ============ -->
+<section id="song" class="view">
+  <div class="topbar" id="songBar">
+    <button class="icon" id="btnBack"><svg><use href="#i-back"/></svg></button>
+    <div class="ttl"><b id="songTitle"></b><small id="songSub"></small></div>
+    <button class="icon" id="btnFav"><svg><use href="#i-star"/></svg></button>
+    <button class="icon" id="btnAddPl"><svg><use href="#i-addlist"/></svg></button>
+  </div>
+
+  <div id="videoWrap"><div id="player"></div></div>
+
+  <!-- lyrics source -->
+  <div id="pLyrics" class="pane">
+    <h3>Letra da música</h3>
+    <nav class="seg small" id="lyrTabs"><button data-tab="search" class="on">Buscar</button><button data-tab="paste">Colar</button></nav>
+    <div id="lyrSearch">
+      <div class="row2"><input id="qTrack" placeholder="Música"><input id="qArtist" placeholder="Artista"></div>
+      <button id="lrcSearchBtn" class="btn wide">Buscar letra sincronizada</button>
+      <div id="lrcResults" class="list compact"></div>
     </div>
-    <div id="savedList" class="saved"></div>
-  </section>
-
-  <div id="videoWrap" class="hidden"><div id="player"></div></div>
-
-  <!-- Lyrics source -->
-  <section id="lyricsCard" class="card hidden">
-    <h2>Letra da música</h2>
-    <div class="tabs">
-      <button data-tab="search" class="active">🔎 Buscar</button>
-      <button data-tab="paste">📋 Colar</button>
+    <div id="lyrPaste" class="hidden">
+      <p class="muted">Cole a letra (uma frase por linha). Depois você marca o tempo de cada frase tocando um botão no ritmo da música — só uma vez. Também aceita formato LRC <code>[00:12.34]</code>.</p>
+      <textarea id="pasteBox" rows="8" placeholder="Cole a letra aqui…"></textarea>
+      <button id="pasteBtn" class="btn primary wide">Usar esta letra</button>
     </div>
-    <div id="tab-search">
-      <div class="row" style="margin-bottom:8px">
-        <input id="qTrack" placeholder="Música">
-        <input id="qArtist" placeholder="Artista">
-      </div>
-      <button id="searchBtn" style="width:100%">Buscar letra sincronizada (LRCLIB)</button>
-      <div id="results" class="results"></div>
-    </div>
-    <div id="tab-paste" class="hidden">
-      <p class="muted">Cole a letra aqui. Pode ser <b>texto normal</b> (uma frase por linha — depois você sincroniza tocando um botão no ritmo da música, só uma vez) ou <b>formato LRC</b> com tempos <code>[00:12.34]</code>.</p>
-      <textarea id="pasteBox" rows="9" placeholder="Cole a letra aqui..."></textarea>
-      <button id="pasteBtn" class="primary" style="width:100%;margin-top:8px">Usar esta letra</button>
-    </div>
-    <p id="lyricsStatus" class="muted"></p>
-  </section>
+  </div>
 
-  <!-- Sync -->
-  <section id="syncCard" class="card hidden">
-    <h2>⏱ Sincronizar letra</h2>
-    <p class="muted">Dê play e toque <b>MARCAR</b> no instante em que cada frase <b>começa</b> a ser cantada. No PC: <b>barra de espaço</b> marca, <b>Backspace</b> desfaz. Só precisa fazer uma vez — fica salvo.</p>
+  <!-- sync -->
+  <div id="pSync" class="pane">
+    <h3>Sincronizar letra</h3>
+    <p class="muted">Dê play e toque o botão no instante em que cada frase <b>começa</b>. No PC: espaço marca, Backspace desfaz.</p>
     <div class="syncnum" id="syncProg"></div>
-    <div class="lyrics" style="min-height:130px">
+    <div class="lyrics short">
       <div class="line prev" id="sPrev"></div>
       <div class="line cur" id="sCur"></div>
       <div class="line next" id="sNext"></div>
     </div>
-    <button id="sMark" class="primary big">MARCAR</button>
-    <div class="controls">
-      <button id="sPlay">⏯ Play/Pausa</button>
-      <button id="sUndo">↶ Desfazer</button>
-      <button id="sGap" title="Marca o fim da frase anterior (antes de um solo/instrumental)">⏹ Fim de frase</button>
-      <select id="sSpeed"><option value="1">1x</option><option value="0.75">0.75x</option><option value="0.5">0.5x</option></select>
-      <button id="sCancel">Cancelar</button>
+    <div class="synccontrols">
+      <button class="round" id="sUndo"><svg><use href="#i-replay"/></svg><span>Desfazer</span></button>
+      <button class="bigcircle" id="sMark"><span>MARCAR</span></button>
+      <button class="round" id="sPlay"><svg><use href="#i-play"/></svg><span>Play</span></button>
     </div>
-  </section>
+    <div class="chips center">
+      <button class="chip" id="sGap">Fim de frase (solo)</button>
+      <button class="chip" id="sSpeed">1x</button>
+      <button class="chip" id="sCancel">Cancelar</button>
+    </div>
+  </div>
 
-  <!-- Ready / settings -->
-  <section id="readyCard" class="card hidden">
-    <h2 id="readyTitle">Pronto!</h2>
-    <p class="muted" id="readyInfo"></p>
-    <div class="grid2">
-      <div><label class="lbl">Dificuldade</label>
-        <select id="optDiff"><option value="facil">Fácil (algumas frases)</option><option value="medio">Médio (1 palavra/frase)</option><option value="dificil">Difícil (2 palavras/frase)</option></select></div>
-      <div><label class="lbl">Responder</label>
-        <select id="optMode"><option value="type">Digitando</option><option value="choice">Múltipla escolha</option></select></div>
-      <div><label class="lbl">Velocidade</label>
-        <select id="optSpeed"><option value="1">1x normal</option><option value="0.75">0.75x</option><option value="0.5">0.5x</option></select></div>
-      <div><label class="lbl">Idioma da música</label>
-        <select id="optLang"><option value="en">Inglês</option><option value="es">Espanhol</option><option value="fr">Francês</option><option value="it">Italiano</option><option value="de">Alemão</option><option value="ja">Japonês</option><option value="ko">Coreano</option><option value="pt">Português</option></select></div>
-      <div style="grid-column:1/-1"><label class="lbl">Se eu demorar para responder, repetir o trecho</label>
-        <select id="optAuto"><option value="0">Nunca (só pelo botão)</option><option value="5">Depois de 5s</option><option value="8">Depois de 8s</option><option value="12">Depois de 12s</option><option value="20">Depois de 20s</option></select></div>
+  <!-- ready -->
+  <div id="pReady" class="pane center">
+    <button class="bigcircle play" id="playBtn"><svg><use href="#i-play"/></svg></button>
+    <p class="readyinfo" id="readyInfo"></p>
+    <div class="chips center" id="readyChips"></div>
+    <div class="chips center">
+      <button class="chip ghost" id="resyncBtn">Re-sincronizar</button>
+      <button class="chip ghost" id="editBtn">Editar LRC</button>
+      <button class="chip ghost" id="changeBtn">Trocar letra</button>
     </div>
-    <label class="check" style="margin-bottom:12px"><input type="checkbox" id="optTr"> Mostrar tradução (PT-BR) depois de completar a frase</label>
-    <button id="playBtn" class="primary big">▶ Jogar</button>
-    <div class="btnrow" style="margin-top:10px">
-      <button id="resyncBtn">⏱ Re-sincronizar</button>
-      <button id="editBtn">✏️ Ver/editar LRC</button>
-      <button id="changeBtn">🔄 Trocar letra</button>
+    <div id="editBox" class="hidden">
+      <textarea id="lrcBox" rows="9"></textarea>
+      <div class="chips center"><button class="chip" id="lrcSave">Salvar</button><button class="chip" id="lrcCopy">Copiar</button></div>
     </div>
-    <div id="editBox" class="hidden" style="margin-top:10px">
-      <textarea id="lrcBox" rows="10"></textarea>
-      <div class="btnrow" style="margin-top:6px"><button id="lrcSave" class="primary">Salvar LRC</button><button id="lrcCopy">Copiar</button></div>
-    </div>
-  </section>
+  </div>
 
-  <!-- Game -->
-  <section id="gameCard" class="card hidden">
+  <!-- game -->
+  <div id="pGame" class="pane">
     <div class="hud">
+      <button class="icon sm" id="gQuit"><svg><use href="#i-close"/></svg></button>
       <div class="bar"><div id="progress"></div></div>
-      <span><b id="hudScore">0</b> pts</span><span>🔥<b id="hudStreak">0</b></span>
+      <div class="pill"><b id="hudScore">0</b></div>
+      <div class="pill streak">🔥<b id="hudStreak">0</b></div>
+      <button class="icon sm" id="gSet"><svg><use href="#i-gear"/></svg></button>
     </div>
     <div class="lyrics">
       <div id="lPrev" class="line prev"></div>
@@ -196,40 +142,42 @@ label.lbl{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
       <div id="lNext" class="line next"></div>
     </div>
     <div id="status" class="status"></div>
-    <form id="answerForm" class="row" autocomplete="off">
-      <input id="answer" placeholder="digite a palavra que falta" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
-      <button class="primary" type="submit">OK</button>
-    </form>
-    <div id="choices" class="choices hidden"></div>
-    <div class="controls">
-      <button id="btnReplay">🔁 Ouvir de novo</button>
-      <button id="btnHint">💡 Dica</button>
-      <button id="btnSkip">⏭ Pular</button>
-      <button id="btnPause">⏯</button>
-    </div>
-    <div class="controls">
-      <span class="muted" style="align-self:center">Sincronia</span>
-      <button id="offMinus" title="Use − se a letra aparece antes da voz">−</button>
-      <span class="val" id="offVal">0.0s</span>
-      <button id="offPlus" title="Use + se a letra aparece depois da voz">+</button>
-      <select id="gSpeed"><option value="1">1x</option><option value="0.75">0.75x</option><option value="0.5">0.5x</option></select>
-      <button id="btnQuit">Sair</button>
-    </div>
-  </section>
-</main>
 
-<div id="resultsModal" class="modal hidden">
-  <div class="card">
-    <h2>🎉 Fim da música!</h2>
-    <div class="stats">
-      <div><b id="rScore">0</b><span class="muted">pontos</span></div>
-      <div><b id="rAcc">0%</b><span class="muted">acertos</span></div>
-      <div><b id="rBest">0</b><span class="muted">recorde</span></div>
+    <div id="pad" class="pad">
+      <button class="opt up" data-k="0"></button>
+      <button class="opt left" data-k="1"></button>
+      <button class="center replayBtn" id="padCenter" title="Ouvir de novo">
+        <svg class="ring" viewBox="0 0 80 80"><circle cx="40" cy="40" r="36"/></svg>
+        <svg class="ic"><use href="#i-replay"/></svg>
+      </button>
+      <button class="opt right" data-k="2"></button>
+      <button class="opt down" data-k="3"></button>
     </div>
-    <div id="rMissedWrap"><p class="muted">Palavras para revisar:</p><ul id="rMissed" class="missed"></ul></div>
-    <div class="btnrow"><button id="rAgain" class="primary">Jogar de novo</button><button id="rClose">Fechar</button></div>
+
+    <form id="answerForm" class="typebar" autocomplete="off">
+      <button type="button" class="replayBtn mini" id="typeReplay" title="Ouvir de novo">
+        <svg class="ring" viewBox="0 0 80 80"><circle cx="40" cy="40" r="36"/></svg>
+        <svg class="ic"><use href="#i-replay"/></svg>
+      </button>
+      <input id="answer" placeholder="palavra que falta" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
+      <button class="send" type="submit"><svg><use href="#i-send"/></svg></button>
+    </form>
+
+    <div class="actions">
+      <button class="round" id="gHint"><svg><use href="#i-bulb"/></svg><span>Dica</span></button>
+      <button class="round" id="gPause"><svg><use href="#i-pause"/></svg><span>Pausa</span></button>
+      <button class="round" id="gSkip"><svg><use href="#i-skip"/></svg><span>Pular</span></button>
+      <button class="round" id="gSpeed"><b>1x</b><span>Velocidade</span></button>
+    </div>
   </div>
+</section>
+
+<!-- bottom sheet -->
+<div id="sheet" class="sheet hidden">
+  <div class="sheet-bg" id="sheetBg"></div>
+  <div class="sheet-body"><div class="grabber"></div><div id="sheetContent"></div></div>
 </div>
+<div id="toast" class="toast"></div>
 
 <script src="app.js"></script>
 </body>

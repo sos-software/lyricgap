@@ -1,43 +1,66 @@
 'use strict';
 /* LyricGap — complete song lyrics while the YouTube video plays. */
 
+/* ================= utils ================= */
 const $ = s => document.querySelector(s);
-const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const decode = s => { const t = document.createElement('textarea'); t.innerHTML = s; return t.value; };
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { } }
 };
+const wait = ms => new Promise(r => setTimeout(r, ms));
 const isTouch = matchMedia('(pointer: coarse)').matches;
-const DEFAULT_URL = 'https://www.youtube.com/watch?v=PTdzL_K_ss8';
+const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const isStandalone = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+const thumb = id => `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
+const fmt = t => { const m = Math.floor(t / 60), s = (t - m * 60).toFixed(2).padStart(5, '0'); return `${String(m).padStart(2, '0')}:${s}`; };
+const fmtDur = t => t > 0 ? `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}` : '';
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0;[a[i], a[j]] = [a[j], a[i]]; } return a; };
+const uid = () => Math.random().toString(36).slice(2, 9);
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 2200); }
+const icon = (name, cls = '') => `<svg class="${cls}"><use href="#i-${name}"/></svg>`;
 
+/* ================= settings & library ================= */
 const settings = Object.assign(
-  { difficulty: 'medio', mode: isTouch ? 'choice' : 'type', speed: 1, translate: true, lang: 'en', autoReplay: 8 },
+  { difficulty: 'medio', mode: isTouch ? 'choice' : 'type', speed: 1, translate: true, lang: 'en', autoReplay: 8, sounds: true, ytKey: '', pipedOk: '' },
   store.get('lg:settings', {})
 );
 const saveSettings = () => store.set('lg:settings', settings);
-let songs = store.get('lg:songs', {});
-const saveSongs = () => store.set('lg:songs', songs);
+
+let lib = store.get('lg:lib', null) || (() => {
+  const old = store.get('lg:songs', {}), videos = {};
+  for (const [id, s] of Object.entries(old)) videos[id] = { id, title: s.title || id, author: '', lrc: s.lrc || null, offset: s.offset || 0, best: s.best || 0, fav: false, updated: s.updated || 0 };
+  return { videos, playlists: [], recent: Object.keys(videos) };
+})();
+const saveLib = () => store.set('lg:lib', lib);
+function vid(id, meta) {
+  let v = lib.videos[id];
+  if (!v) v = lib.videos[id] = { id, title: '', author: '', lrc: null, offset: 0, best: 0, fav: false, updated: Date.now() };
+  if (meta) { if (meta.title) v.title = meta.title; if (meta.author) v.author = meta.author; }
+  return v;
+}
 const trCache = store.get('lg:tr', {});
 
 const STOP = new Set(('the a an and or but of to in on at for is it its i you me my we he she they them his her our your be am are was were ' +
   'do did does so as if no not oh ooh ah uh yeah hey la na da o e de do um uma que en el los las y se mi tu te le les du un une et je il').split(' '));
 
-/* ---------- state ---------- */
-let player = null, apiReady = false, playerReady = false, pendingId = null;
+/* ================= state ================= */
+let player = null, apiReady = false, playerReady = false, pendingId = null, wakeLock = null;
 const S = {
-  videoId: null, title: '', author: '', autoSearched: false,
-  entries: [],            // [{t, text}] raw synced lyrics (text '' = end marker)
-  lines: [], pool: [],    // game lines
-  phase: 'idle',          // idle | lyrics | sync | ready | play
-  cur: -1, hold: null, waiting: false, finished: false,
+  videoId: null, v: null, autoSearched: false, queue: null,
+  entries: [], lines: [], pool: [],
+  phase: 'idle',        // idle | lyrics | sync | ready | play
+  cur: -1, hold: null, waiting: false, finished: false, lastActivity: 0,
   score: 0, streak: 0, offset: 0,
   sync: { lines: [], idx: 0, entries: [] }
 };
+const H = { tab: 'recent', plOpen: null, results: null, query: '' };
 
-/* ---------- helpers ---------- */
+/* ================= text helpers ================= */
 function norm(s) {
-  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/[’‘`´]/g, "'").replace(/[^\p{L}\p{N}']/gu, '');
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’‘`´]/g, "'").replace(/[^\p{L}\p{N}']/gu, '');
 }
 function lev(a, b) {
   const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
@@ -56,18 +79,16 @@ function judge(input, answer) {
   if (b.length >= 5 && lev(a, b) <= 1) return 'close';
   return 'wrong';
 }
-const shuffle = arr => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0;[arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
-const fmt = t => { const m = Math.floor(t / 60), s = (t - m * 60).toFixed(2).padStart(5, '0'); return `${String(m).padStart(2, '0')}:${s}`; };
-
 function parseVideoId(u) {
   u = (u || '').trim();
-  if (/^[\w-]{11}$/.test(u)) return u;
   const m = u.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([\w-]{11})/);
-  return m ? m[1] : null;
+  if (m) return m[1];
+  if (/^[\w-]{11}$/.test(u) && /[\d_-]/.test(u)) return u;
+  return null;
 }
 function parseLRC(text) {
   const out = []; let tagged = 0;
-  for (const raw of text.split(/\r?\n/)) {
+  for (const raw of (text || '').split(/\r?\n/)) {
     const tags = [...raw.matchAll(/\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]/g)];
     if (!tags.length) continue;
     tagged++;
@@ -80,174 +101,328 @@ function parseLRC(text) {
 const toLRC = entries => entries.map(e => `[${fmt(e.t)}]${e.text}`).join('\n');
 const plainLines = text => text.split(/\r?\n/).map(s => s.replace(/\[[^\]]*\]/g, '').trim()).filter(Boolean);
 
-/* ---------- UI helpers ---------- */
-const sections = ['lyricsCard', 'syncCard', 'readyCard', 'gameCard'];
-function show(id) { sections.forEach(s => $('#' + s).classList.toggle('hidden', s !== id)); }
-function setStatus(msg, cls = '') { const el = $('#status'); el.textContent = msg; el.className = 'status ' + cls; }
-function flash(cls) { const el = $('#lCur'); el.classList.remove('flash-ok', 'flash-bad'); void el.offsetWidth; el.classList.add(cls); }
+/* ================= sounds ================= */
+let actx = null;
+function beep(ok) {
+  if (!settings.sounds) return;
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const notes = ok ? [660, 880] : [220, 180];
+    notes.forEach((f, i) => {
+      const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime + i * 0.09;
+      o.type = ok ? 'sine' : 'square'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(ok ? 0.12 : 0.05, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+      o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.18);
+    });
+  } catch { }
+}
 
-/* ---------- YouTube ---------- */
-window.onYouTubeIframeAPIReady = () => { apiReady = true; if (pendingId) createPlayer(pendingId); };
+/* ================= navigation ================= */
+function go(view) {
+  document.body.dataset.view = view;
+  if (view === 'home') {
+    if (playerReady) player.pauseVideo();
+    if (S.phase === 'play') endPlay();
+    S.phase = 'idle';
+    renderHome();
+  }
+  window.scrollTo(0, 0);
+}
+const panes = ['pLyrics', 'pSync', 'pReady', 'pGame'];
+function showPane(id) { panes.forEach(p => $('#' + p).classList.toggle('on', p === id)); }
+window.addEventListener('popstate', () => { if (document.body.dataset.view === 'song') go('home'); });
+
+/* ================= home ================= */
+function videoItem(v, { onOpen, trailing } = {}) {
+  const lv = lib.videos[v.id];
+  const el = document.createElement('div');
+  el.className = 'item';
+  el.innerHTML = `<img class="thumb" loading="lazy" src="${thumb(v.id)}" alt="">
+    <div class="meta"><b>${esc(v.title || 'Vídeo ' + v.id)}</b>
+    <small>${lv && lv.lrc ? '<span class="badge">LETRA OK</span>' : ''}${lv && lv.best ? '★' + lv.best + ' · ' : ''}${esc(v.author || '')}${v.dur > 0 ? ' · ' + fmtDur(v.dur) : ''}</small></div>`;
+  const fav = document.createElement('button');
+  fav.className = 'icon sm' + (lv && lv.fav ? ' on' : '');
+  fav.innerHTML = icon(lv && lv.fav ? 'star-f' : 'star');
+  fav.onclick = e => { e.stopPropagation(); toggleFav(v); renderHome(); };
+  el.appendChild(fav);
+  if (trailing) el.appendChild(trailing);
+  else {
+    const add = document.createElement('button');
+    add.className = 'icon sm'; add.innerHTML = icon('addlist');
+    add.onclick = e => { e.stopPropagation(); sheetAddToPlaylist(v); };
+    el.appendChild(add);
+  }
+  el.onclick = onOpen || (() => openSong(v.id, v));
+  return el;
+}
+function toggleFav(v) {
+  const x = vid(v.id, v); x.fav = !x.fav; x.updated = Date.now(); saveLib();
+  toast(x.fav ? '★ Adicionada aos favoritos' : 'Removida dos favoritos');
+  return x.fav;
+}
+function emptyMsg(html) { const d = document.createElement('div'); d.className = 'empty'; d.innerHTML = html; return d; }
+
+function renderHome() {
+  const box = $('#homeList'); box.innerHTML = '';
+  $$('#homeTabs button').forEach(b => b.classList.toggle('on', !H.results && b.dataset.tab === H.tab));
+  if (H.results) {
+    const head = document.createElement('div'); head.className = 'listhead';
+    head.innerHTML = `<h3>${H.results === 'loading' ? 'Buscando…' : 'Resultados'}</h3>`;
+    const x = document.createElement('button'); x.className = 'icon sm'; x.innerHTML = icon('close');
+    x.onclick = () => { H.results = null; $('#q').value = ''; renderHome(); };
+    head.appendChild(x); box.appendChild(head);
+    if (H.results === 'loading') return;
+    if (H.results.error) { box.appendChild(emptyMsg(H.results.error)); return; }
+    if (!H.results.length) { box.appendChild(emptyMsg('Nada encontrado.')); return; }
+    H.results.forEach(v => box.appendChild(videoItem(v)));
+    return;
+  }
+  if (H.tab === 'recent') {
+    const list = lib.recent.map(id => lib.videos[id]).filter(Boolean);
+    if (!list.length) box.appendChild(emptyMsg('🎵<br>Busque uma música acima para começar.<br>Você também pode colar um link do YouTube.'));
+    list.forEach(v => box.appendChild(videoItem(v)));
+  } else if (H.tab === 'fav') {
+    const list = Object.values(lib.videos).filter(v => v.fav).sort((a, b) => b.updated - a.updated);
+    if (!list.length) box.appendChild(emptyMsg('Nenhum favorito ainda.<br>Toque na ☆ de uma música para salvar aqui.'));
+    list.forEach(v => box.appendChild(videoItem(v)));
+  } else if (H.plOpen) {
+    const pl = lib.playlists.find(p => p.id === H.plOpen);
+    if (!pl) { H.plOpen = null; return renderHome(); }
+    const head = document.createElement('div'); head.className = 'listhead';
+    head.innerHTML = `<button class="icon sm" data-a="back">${icon('back')}</button><h3>${esc(pl.name)}</h3>
+      <button class="icon sm" data-a="more">${icon('more')}</button>
+      <button class="btn primary" data-a="play" style="padding:8px 16px">${icon('play', 'inl')}</button>`;
+    head.querySelector('[data-a=back]').onclick = () => { H.plOpen = null; renderHome(); };
+    head.querySelector('[data-a=more]').onclick = () => sheetPlaylistMenu(pl);
+    head.querySelector('[data-a=play]').onclick = () => pl.items.length ? openSong(pl.items[0], lib.videos[pl.items[0]], { plId: pl.id, ids: pl.items.slice(), idx: 0, name: pl.name }) : toast('Playlist vazia');
+    box.appendChild(head);
+    if (!pl.items.length) box.appendChild(emptyMsg('Playlist vazia.<br>Use o botão ＋ ao lado das músicas para adicionar.'));
+    pl.items.forEach((id, i) => {
+      const v = lib.videos[id] || { id };
+      const rm = document.createElement('button'); rm.className = 'icon sm'; rm.innerHTML = icon('trash');
+      rm.onclick = e => { e.stopPropagation(); pl.items.splice(i, 1); saveLib(); renderHome(); };
+      box.appendChild(videoItem(v, { trailing: rm, onOpen: () => openSong(id, v, { plId: pl.id, ids: pl.items.slice(), idx: i, name: pl.name }) }));
+    });
+  } else {
+    const nw = document.createElement('div'); nw.className = 'item';
+    nw.innerHTML = `<div class="thumb sq">＋</div><div class="meta"><b>Nova playlist</b></div>`;
+    nw.onclick = () => sheetNewPlaylist();
+    box.appendChild(nw);
+    lib.playlists.forEach(pl => {
+      const el = document.createElement('div'); el.className = 'item';
+      el.innerHTML = (pl.items[0] ? `<img class="thumb sq" style="object-fit:cover" src="${thumb(pl.items[0])}" alt="">` : `<div class="thumb sq">♪</div>`) +
+        `<div class="meta"><b>${esc(pl.name)}</b><small>${pl.items.length} música${pl.items.length === 1 ? '' : 's'}</small></div>`;
+      el.onclick = () => { H.plOpen = pl.id; renderHome(); };
+      box.appendChild(el);
+    });
+  }
+}
+
+/* ================= YouTube search ================= */
+const PIPED = ['https://api.piped.private.coffee', 'https://pipedapi.kavin.rocks', 'https://pipedapi.adminforge.de', 'https://pipedapi.r4fo.com',
+  'https://pipedapi.leptons.xyz', 'https://piped-api.lunar.icu', 'https://pipedapi.darkness.services', 'https://pipedapi.drgns.space'];
+async function fetchT(url, ms = 7000) {
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
+  try { return await fetch(url, { signal: c.signal }); } finally { clearTimeout(t); }
+}
+async function ytSearch(q) {
+  if (settings.ytKey) {
+    const r = await fetchT('https://www.googleapis.com/youtube/v3/search?' + new URLSearchParams({ part: 'snippet', type: 'video', maxResults: '20', videoEmbeddable: 'true', q, key: settings.ytKey }));
+    const j = await r.json();
+    if (j.error) throw new Error('API do YouTube: ' + j.error.message);
+    return j.items.map(it => ({ id: it.id.videoId, title: decode(it.snippet.title), author: decode(it.snippet.channelTitle) }));
+  }
+  const order = [settings.pipedOk, ...PIPED.filter(x => x !== settings.pipedOk)].filter(Boolean);
+  for (const base of order) {
+    try {
+      const r = await fetchT(`${base}/search?${new URLSearchParams({ q, filter: 'videos' })}`);
+      if (!r.ok) continue;
+      const j = await r.json();
+      const items = (j.items || []).filter(x => x.type === 'stream' && x.url)
+        .map(x => ({ id: (x.url.match(/v=([\w-]{11})/) || [])[1], title: x.title, author: x.uploaderName, dur: x.duration }))
+        .filter(x => x.id && !x.isShort);
+      if (items.length) { if (settings.pipedOk !== base) { settings.pipedOk = base; saveSettings(); } return items; }
+    } catch { }
+  }
+  throw new Error('offline');
+}
+async function doSearch(q) {
+  q = q.trim(); if (!q) return;
+  const id = parseVideoId(q);
+  if (id) { $('#q').value = ''; $('#q').blur(); openSong(id, null); return; }
+  $('#q').blur();
+  H.results = 'loading'; H.query = q; renderHome();
+  try { H.results = await ytSearch(q); }
+  catch (e) {
+    H.results = { error: e.message === 'offline'
+      ? 'Os servidores gratuitos de busca não responderam agora 😕<br><br>Opções: cole o link do vídeo aqui na busca, ou coloque uma <b>chave da API do YouTube</b> (grátis) em ⚙ Configurações para uma busca sempre funcionando.'
+      : esc(e.message) };
+  }
+  if (H.query === q) renderHome();
+}
+
+/* ================= song / player ================= */
+window.onYouTubeIframeAPIReady = () => { apiReady = true; if (pendingId) { createPlayer(pendingId); pendingId = null; } };
 (function loadApi() { const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s); })();
 
 function createPlayer(id) {
   player = new YT.Player('player', {
     videoId: id,
-    playerVars: { playsinline: 1, rel: 0, modestbranding: 1, origin: location.origin, iv_load_policy: 3 },
+    playerVars: { playsinline: 1, rel: 0, modestbranding: 1, origin: location.origin, iv_load_policy: 3, fs: 0 },
     events: {
       onReady: () => { playerReady = true; updateMeta(); },
       onStateChange: e => {
         updateMeta();
         if (e.data === YT.PlayerState.ENDED && S.phase === 'play' && !S.finished) finish();
+        const playing = e.data === YT.PlayerState.PLAYING;
+        $('#gPause').innerHTML = icon(playing ? 'pause' : 'play') + `<span>${playing ? 'Pausa' : 'Tocar'}</span>`;
+        $('#sPlay').innerHTML = icon(playing ? 'pause' : 'play') + `<span>${playing ? 'Pausa' : 'Play'}</span>`;
       },
       onError: e => {
-        const msg = (e.data === 101 || e.data === 150) ? 'Esse vídeo não permite ser tocado fora do YouTube. Tente outro link (ex.: versão "lyrics" ou "audio").' : 'Erro no player do YouTube (código ' + e.data + ').';
-        $('#lyricsStatus').textContent = msg; alert(msg);
+        const msg = (e.data === 101 || e.data === 150) ? 'Esse vídeo não pode ser tocado fora do YouTube. Tente outra versão (ex.: "lyrics" ou "audio").' : 'Erro no player do YouTube (' + e.data + ').';
+        toast(msg);
       }
     }
   });
 }
-function loadVideo(id) {
-  S.videoId = id; S.title = ''; S.author = ''; S.autoSearched = false;
-  store.set('lg:last', id);
-  $('#videoWrap').classList.remove('hidden');
+function openSong(id, meta, queue = null) {
+  S.queue = queue;
+  const v = vid(id, meta);
+  lib.recent = [id, ...lib.recent.filter(x => x !== id)].slice(0, 50);
+  saveLib();
+  Object.assign(S, { videoId: id, v, offset: v.offset || 0, autoSearched: false, entries: [] });
+  if (document.body.dataset.view !== 'song') history.pushState({ song: id }, '');
+  document.body.dataset.view = 'song';
+  window.scrollTo(0, 0);
+  updateSongBar();
   if (player && playerReady) player.cueVideoById(id);
   else if (apiReady && !player) createPlayer(id);
   else pendingId = id;
-
-  const saved = songs[id];
-  $('#results').innerHTML = ''; $('#lyricsStatus').textContent = '';
-  if (saved && saved.lrc) {
-    S.offset = saved.offset || 0;
-    setEntries(parseLRC(saved.lrc), false);
-  } else {
-    S.offset = 0; S.entries = [];
-    S.phase = 'lyrics'; show('lyricsCard');
+  $('#lrcResults').innerHTML = '';
+  if (v.lrc && parseLRC(v.lrc)) setEntries(parseLRC(v.lrc), false);
+  else {
+    S.phase = 'lyrics'; showPane('pLyrics'); prefillLyrics();
+    if (v.title) { S.autoSearched = true; searchLyrics(); }
   }
-  renderSaved();
+}
+function updateSongBar() {
+  const v = S.v; if (!v) return;
+  $('#songTitle').textContent = v.title || 'Carregando…';
+  $('#songSub').textContent = S.queue ? `${S.queue.name} · ${S.queue.idx + 1}/${S.queue.ids.length}` : (v.author || '');
+  $('#btnFav').classList.toggle('on', !!v.fav);
+  $('#btnFav').innerHTML = icon(v.fav ? 'star-f' : 'star');
 }
 function updateMeta() {
-  if (!playerReady || S.title) return;
+  if (!playerReady || !S.v) return;
   const d = player.getVideoData && player.getVideoData();
-  if (!d || !d.title) return;
-  S.title = d.title;
-  S.author = (d.author || '').replace(/\s*-\s*Topic$/i, '').replace(/VEVO$/i, '').trim();
-  let track = S.title, artist = S.author;
-  const m = S.title.match(/^(.+?)\s+[-–]\s+(.+)$/);
-  if (m) { artist = m[1]; track = m[2]; }
-  track = track.replace(/[([](official|lyric|audio|video|clipe|hd|4k|visualizer|live)[^)\]]*[)\]]/gi, '').trim();
-  $('#qTrack').value = track; $('#qArtist').value = artist;
-  $('#hdrInfo').textContent = S.title.length > 30 ? S.title.slice(0, 30) + '…' : S.title;
-  if (songs[S.videoId]) { songs[S.videoId].title = S.title; saveSongs(); renderSaved(); }
+  if (!d || !d.title || d.video_id !== S.videoId) return;
+  const v = S.v;
+  if (!v.title || !v.author) {
+    v.title = v.title || d.title;
+    v.author = v.author || (d.author || '').replace(/\s*-\s*Topic$/i, '').replace(/VEVO$/i, '').trim();
+    saveLib(); updateSongBar();
+    if (S.phase === 'lyrics') prefillLyrics();
+  }
   if (S.phase === 'lyrics' && !S.autoSearched) { S.autoSearched = true; searchLyrics(); }
-  if (S.phase === 'ready') renderReady();
+}
+function prefillLyrics() {
+  const v = S.v; let track = v.title || '', artist = (v.author || '').replace(/\s*-\s*Topic$/i, '').replace(/VEVO$/i, '').trim();
+  const m = track.match(/^(.+?)\s+[-–]\s+(.+)$/);
+  if (m) { artist = m[1]; track = m[2]; }
+  track = track.replace(/[([](official|lyric|audio|video|clipe|hd|4k|visualizer|live|letra|legendado|tradu)[^)\]]*[)\]]/gi, '').replace(/\s+/g, ' ').trim();
+  $('#qTrack').value = track; $('#qArtist').value = artist;
 }
 
-/* ---------- lyrics search (LRCLIB) ---------- */
+/* ================= lyrics (LRCLIB) ================= */
 async function searchLyrics() {
   const track = $('#qTrack').value.trim(), artist = $('#qArtist').value.trim();
-  const box = $('#results'); box.innerHTML = '<p class="muted">Buscando…</p>';
+  const box = $('#lrcResults'); box.innerHTML = '<p class="muted" style="text-align:center">Buscando letra…</p>';
   try {
     let res = [];
     if (track) {
       const p = new URLSearchParams({ track_name: track }); if (artist) p.set('artist_name', artist);
-      res = await (await fetch('https://lrclib.net/api/search?' + p)).json();
+      res = await (await fetchT('https://lrclib.net/api/search?' + p, 10000)).json();
     }
-    if (!res.length) res = await (await fetch('https://lrclib.net/api/search?' + new URLSearchParams({ q: `${track} ${artist}`.trim() }))).json();
-    res = res.filter(r => r.syncedLyrics || r.plainLyrics).sort((a, b) => (!!b.syncedLyrics) - (!!a.syncedLyrics)).slice(0, 10);
+    if (!res.length) res = await (await fetchT('https://lrclib.net/api/search?' + new URLSearchParams({ q: `${track} ${artist}`.trim() }), 10000)).json();
+    res = res.filter(r => r.syncedLyrics || r.plainLyrics).sort((a, b) => (!!b.syncedLyrics) - (!!a.syncedLyrics)).slice(0, 8);
     if (!res.length) {
-      box.innerHTML = '<p class="muted">Não encontrei essa letra no LRCLIB. 👉 Vá na aba <b>Colar</b>, cole a letra (de qualquer site de letras) e sincronize — leva o tempo de ouvir a música uma vez, e fica salvo.</p>';
+      box.innerHTML = '<p class="muted">Não achei essa letra no banco de letras. 👉 Toque em <b>Colar</b>, cole a letra (de qualquer site de letras) e sincronize — leva o tempo de ouvir a música uma vez, e fica salvo.</p>';
       return;
     }
     const vd = playerReady ? player.getDuration() : 0;
     box.innerHTML = '';
     res.forEach(r => {
-      const b = document.createElement('button');
+      const b = document.createElement('div'); b.className = 'item';
       const diff = vd && r.duration ? Math.abs(vd - r.duration) : 0;
-      b.innerHTML = `<span>${esc(r.trackName)} — ${esc(r.artistName)}<br><small>${r.syncedLyrics ? '✅ sincronizada' : '📝 só texto (você sincroniza)'}${r.duration ? ' · ' + fmt(r.duration).slice(0, 5) : ''}${diff > 4 ? ' · ⚠️ duração diferente do vídeo' : ''}</small></span>`;
-      b.onclick = () => {
-        if (r.syncedLyrics) setEntries(parseLRC(r.syncedLyrics), true);
-        else startSync(plainLines(r.plainLyrics));
-      };
+      b.innerHTML = `<div class="meta"><b>${esc(r.trackName)} — ${esc(r.artistName)}</b><small>${r.syncedLyrics ? '<span class="badge">SINCRONIZADA</span>' : 'só texto · você sincroniza'}${r.duration ? ' · ' + fmtDur(r.duration) : ''}${diff > 4 ? ' · ⚠ duração diferente do vídeo' : ''}</small></div>`;
+      b.onclick = () => { if (r.syncedLyrics) setEntries(parseLRC(r.syncedLyrics), true); else startSync(plainLines(r.plainLyrics)); };
       box.appendChild(b);
     });
   } catch (e) {
-    box.innerHTML = '<p class="muted">Erro ao buscar (' + esc(e.message) + '). Use a aba Colar.</p>';
+    box.innerHTML = '<p class="muted">Erro ao buscar a letra. Use a aba Colar.</p>';
   }
 }
-
 function setEntries(entries, save) {
   if (!entries || !entries.length) return;
   S.entries = entries;
   if (save) saveSong();
-  S.phase = 'ready'; show('readyCard'); renderReady();
+  S.phase = 'ready'; showPane('pReady'); renderReady();
 }
 function saveSong() {
-  const prev = songs[S.videoId] || {};
-  songs[S.videoId] = { ...prev, title: S.title || prev.title || S.videoId, lrc: toLRC(S.entries), offset: S.offset, updated: Date.now() };
-  saveSongs(); renderSaved();
+  const v = S.v; v.lrc = toLRC(S.entries); v.offset = S.offset; v.updated = Date.now(); saveLib();
 }
-function renderSaved() {
-  const box = $('#savedList'); box.innerHTML = '';
-  Object.entries(songs).sort((a, b) => (b[1].updated || 0) - (a[1].updated || 0)).forEach(([id, s]) => {
-    const b = document.createElement('button');
-    b.textContent = '🎵 ' + (s.title || id) + (s.best ? ` · ${s.best} pts` : '');
-    b.onclick = () => { $('#url').value = 'https://www.youtube.com/watch?v=' + id; loadVideo(id); };
-    box.appendChild(b);
-  });
-}
+const DIFF_LABEL = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' };
 function renderReady() {
   const n = S.entries.filter(e => e.text).length;
-  $('#readyTitle').textContent = S.title ? '🎶 ' + S.title : 'Pronto!';
-  const best = songs[S.videoId]?.best;
-  $('#readyInfo').textContent = `${n} frases carregadas.${best ? ' Recorde: ' + best + ' pts.' : ''} O vídeo pausa no fim de cada frase com lacuna; acertou = continua, errou = volta a frase.`;
-  $('#optDiff').value = settings.difficulty; $('#optMode').value = settings.mode;
-  $('#optSpeed').value = String(settings.speed); $('#optLang').value = settings.lang; $('#optTr').checked = settings.translate;
-  $('#optAuto').value = String(settings.autoReplay);
+  const best = S.v && S.v.best;
+  $('#readyInfo').innerHTML = `${n} frases${best ? ' · recorde <b>' + best + '</b>' : ''}<br>O vídeo pausa no fim de cada frase com lacuna.`;
+  const chips = [DIFF_LABEL[settings.difficulty], settings.mode === 'choice' ? 'Escolha' : 'Digitando', settings.speed + 'x', settings.autoReplay ? 'Repete em ' + settings.autoReplay + 's' : 'Sem repetição auto'];
+  $('#readyChips').innerHTML = chips.map(c => `<button class="chip">${esc(c)}</button>`).join('');
+  $$('#readyChips .chip').forEach(c => c.onclick = sheetSettings);
   $('#lrcBox').value = toLRC(S.entries);
 }
 
-/* ---------- sync mode ---------- */
+/* ================= sync mode ================= */
 function startSync(lines) {
-  if (!lines.length) { alert('Nenhuma linha de letra encontrada.'); return; }
+  if (!lines.length) { toast('Nenhuma linha de letra encontrada.'); return; }
   S.sync = { lines, idx: 0, entries: [] };
-  S.phase = 'sync'; show('syncCard'); renderSync();
+  S.phase = 'sync'; showPane('pSync'); renderSync();
   if (playerReady) { player.pauseVideo(); player.seekTo(0, true); }
 }
 function renderSync() {
   const { lines, idx } = S.sync;
-  $('#syncProg').textContent = `${Math.min(idx, lines.length)} / ${lines.length} frases marcadas`;
+  $('#syncProg').textContent = `${Math.min(idx, lines.length)} / ${lines.length}`;
   $('#sPrev').textContent = lines[idx - 1] || '';
   if (idx < lines.length) {
     $('#sCur').textContent = lines[idx];
     $('#sNext').textContent = lines[idx + 1] || '(última frase)';
-    $('#sMark').textContent = 'MARCAR';
+    $('#sMark').innerHTML = '<span>MARCAR</span>';
   } else {
-    $('#sCur').textContent = 'Toque quando a última frase TERMINAR';
+    $('#sCur').textContent = 'Toque quando a última frase terminar';
     $('#sNext').textContent = '';
-    $('#sMark').textContent = 'FIM ✔';
+    $('#sMark').innerHTML = '<span>FIM ✓</span>';
   }
 }
 function syncMark() {
   if (!playerReady) return;
+  if (player.getPlayerState() !== YT.PlayerState.PLAYING && !S.sync.entries.length) { player.playVideo(); return; }
   const { lines, entries } = S.sync;
-  const t = Math.max(0, player.getCurrentTime() - 0.15); // compensate reaction time
-  if (S.sync.idx < lines.length) {
-    entries.push({ t, text: lines[S.sync.idx] }); S.sync.idx++; renderSync();
-  } else {
+  const t = Math.max(0, player.getCurrentTime() - 0.15);
+  if (S.sync.idx < lines.length) { entries.push({ t, text: lines[S.sync.idx] }); S.sync.idx++; renderSync(); }
+  else {
     entries.push({ t: t + 0.15, text: '' });
     player.pauseVideo();
     S.offset = 0;
     S.entries = entries.slice().sort((a, b) => a.t - b.t);
-    saveSong();
-    S.phase = 'ready'; show('readyCard'); renderReady();
+    saveSong(); toast('Letra sincronizada e salva ✓');
+    S.phase = 'ready'; showPane('pReady'); renderReady();
   }
 }
 function syncGap() {
   if (!playerReady || !S.sync.entries.length) return;
   const last = S.sync.entries[S.sync.entries.length - 1];
   if (!last.text) return;
-  S.sync.entries.push({ t: player.getCurrentTime(), text: '' });
+  S.sync.entries.push({ t: player.getCurrentTime(), text: '' }); toast('Fim de frase marcado');
 }
 function syncUndo() {
   const e = S.sync.entries.pop(); if (!e) return;
@@ -256,13 +431,12 @@ function syncUndo() {
   if (playerReady) player.seekTo(Math.max(0, e.t - 3), true);
 }
 
-/* ---------- game ---------- */
+/* ================= game ================= */
 function tokenize(text) {
   return text.split(/(\s+)/).filter(s => s !== '').map(raw => {
     if (/^\s+$/.test(raw)) return { raw, ws: true };
     const m = raw.match(/^([^\p{L}\p{N}]*)(.*?)([^\p{L}\p{N}]*)$/u);
-    const core = m[2];
-    return { raw, pre: m[1], core, post: m[3], word: /\p{L}/u.test(core) };
+    return { raw, pre: m[1], core: m[2], post: m[3], word: /\p{L}/u.test(m[2]) };
   });
 }
 function buildGame() {
@@ -271,7 +445,7 @@ function buildGame() {
   for (let i = 0; i < E.length; i++) {
     if (!E[i].text) continue;
     let end = i + 1 < E.length ? E[i + 1].t : (dur || E[i].t + 6);
-    end = Math.min(end, E[i].t + 10);   // never wait more than 10s (instrumental after a line)
+    end = Math.min(end, E[i].t + 10);
     if (end - E[i].t < 0.6) end = E[i].t + 0.6;
     const tokens = tokenize(E[i].text);
     tokens.forEach(tk => { if (tk.word && tk.core.length >= 2) { const k = norm(tk.core); if (k && !seen.has(k)) seen.set(k, tk.core); } });
@@ -284,7 +458,6 @@ function buildGame() {
     let cand = words.filter(x => x.tk.core.length >= 3 && !STOP.has(norm(x.tk.core)));
     if (!cand.length) cand = words.filter(x => x.tk.core.length >= 2);
     if (!cand.length) return;
-    // prefer longer words a bit
     cand = shuffle(cand).sort((a, b) => (b.tk.core.length > 3) - (a.tk.core.length > 3));
     const count = diff === 'dificil' && words.length >= 5 ? 2 : 1;
     const pick = [];
@@ -294,58 +467,65 @@ function buildGame() {
       line.blanks.push(b); line.blankMap[p.i] = b;
     });
   });
-  S.lines = lines;
-  S.pool = [...seen.values()];
+  S.lines = lines; S.pool = [...seen.values()];
 }
 const activeBlank = line => line && line.blanks.find(b => !b.solved);
 const hasUnsolved = line => !!activeBlank(line);
 
-function startGame() {
-  if (!playerReady) { alert('O vídeo ainda está carregando, tente de novo em instantes.'); return; }
+function applyMode() {
+  $('#pad').classList.toggle('hidden', settings.mode !== 'choice');
+  $('#answerForm').classList.toggle('hidden', settings.mode !== 'type');
+}
+async function startGame() {
+  if (!playerReady) { toast('O vídeo ainda está carregando…'); return; }
   buildGame();
   Object.assign(S, { phase: 'play', cur: -1, hold: null, waiting: false, finished: false, score: 0, streak: 0 });
-  show('gameCard');
-  $('#resultsModal').classList.add('hidden');
-  $('#gSpeed').value = String(settings.speed);
-  $('#answerForm').classList.toggle('hidden', settings.mode !== 'type');
-  $('#choices').classList.toggle('hidden', settings.mode !== 'choice');
-  setStatus('🎧 Ouça e complete as lacunas!', 'info');
-  player.seekTo(0, true);
-  player.setPlaybackRate(settings.speed);
-  player.playVideo();
+  showPane('pGame'); document.body.classList.add('playing'); closeSheet();
+  applyMode();
+  $('#gSpeed').innerHTML = `<b>${settings.speed}x</b><span>Velocidade</span>`;
+  setStatus('🎧 Ouça e complete!', 'info');
+  player.seekTo(0, true); player.setPlaybackRate(settings.speed); player.playVideo();
   renderGame();
+  window.scrollTo(0, 0);
   if (settings.mode === 'type' && !isTouch) $('#answer').focus();
+  try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { }
 }
-
-function lyricTime() { return player.getCurrentTime() + S.offset; }
-function seekLyric(t) { player.seekTo(Math.max(0, t - S.offset), true); }
+function endPlay() {
+  document.body.classList.remove('playing');
+  try { wakeLock && wakeLock.release(); } catch { } wakeLock = null;
+}
+function quitGame() {
+  if (playerReady) player.pauseVideo();
+  endPlay();
+  S.phase = 'ready'; showPane('pReady'); renderReady();
+}
+const lyricTime = () => player.getCurrentTime() + S.offset;
+const seekLyric = t => player.seekTo(Math.max(0, t - S.offset), true);
+function setStatus(msg, cls = '') { const el = $('#status'); el.textContent = msg; el.className = 'status ' + cls; }
+function flash(cls) { const el = $('#lCur'); el.classList.remove('flash-ok', 'flash-bad'); void el.offsetWidth; el.classList.add(cls); }
+function setRing(frac) { $$('.replayBtn .ring circle').forEach(c => c.style.strokeDashoffset = 226 * (1 - Math.max(0, Math.min(1, frac)))); }
 
 function tick() {
   if (S.phase !== 'play' || !playerReady) return;
   const st = player.getPlayerState();
   const L = lyricTime();
   const cur = S.lines[S.cur];
-  // reached end of a line that still has a gap -> stop and wait for the answer
-  if (cur && hasUnsolved(cur) && st === YT.PlayerState.PLAYING && L >= cur.end - 0.15 && L < cur.end + 1.5) {
-    pauseForAnswer(); return;
-  }
+  if (cur && hasUnsolved(cur) && st === YT.PlayerState.PLAYING && L >= cur.end - 0.15 && L < cur.end + 1.5) { pauseForAnswer(); return; }
   if (S.waiting) {
-    if (st === YT.PlayerState.PLAYING && cur && L < cur.end - 0.4) S.waiting = false;
+    if (st === YT.PlayerState.PLAYING && cur && L < cur.end - 0.4) { S.waiting = false; setRing(0); }
     else {
-      // idle too long -> replay the passage automatically (doesn't count as a mistake)
-      const wait = settings.autoReplay * 1000;
-      if (wait && cur) {
-        const left = Math.ceil((wait - (Date.now() - S.lastActivity)) / 1000);
-        if (left <= 0) { setStatus('🔁 Ouvindo o trecho de novo…', 'info'); replayLine(); }
-        else if (left <= 3) $('#replayIn').textContent = ` (repete em ${left}s)`;
-        else $('#replayIn').textContent = '';
+      const w = settings.autoReplay * 1000;
+      if (w && cur) {
+        const el = Date.now() - S.lastActivity;
+        setRing(el / w);
+        if (el >= w) { setStatus('🔁 Ouvindo de novo…', 'info'); replayLine(); }
       }
       return;
     }
   }
   let idx = -1;
   for (let i = 0; i < S.lines.length; i++) { if (S.lines[i].t <= L) idx = i; else break; }
-  if (S.hold != null) {          // pre-roll before a replayed line: keep showing it
+  if (S.hold != null) {
     const h = S.lines[S.hold];
     if (L < h.t - 2 || L > h.end) S.hold = null; else if (L < h.t) idx = S.hold; else S.hold = null;
   }
@@ -357,23 +537,18 @@ setInterval(tick, 50);
 
 function pauseForAnswer() {
   player.pauseVideo();
-  S.waiting = true;
-  S.lastActivity = Date.now();
+  S.waiting = true; S.lastActivity = Date.now();
   const b = activeBlank(S.lines[S.cur]);
-  setStatus(b && b.attempts ? `Tente de novo (${b.attempts}/3)` : 'Qual é a palavra? 👇', 'info');
-  $('#status').insertAdjacentHTML('beforeend', '<span id="replayIn" class="muted"></span>');
+  setStatus(b && b.attempts ? `Tente de novo · ${b.attempts}/3` : 'Qual é a palavra?', 'info');
   if (settings.mode === 'type') $('#answer').focus();
 }
 function replayLine() {
+  setRing(0);
   const line = S.lines[S.cur]; if (!line) { seekLyric(0); player.playVideo(); return; }
   S.waiting = false; S.hold = S.cur;
-  seekLyric(line.t - 0.8);
-  player.playVideo();
+  seekLyric(line.t - 0.8); player.playVideo();
 }
-function resume() {
-  S.waiting = false;
-  player.playVideo();
-}
+function resume() { S.waiting = false; setRing(0); player.playVideo(); }
 
 function submitAnswer(value) {
   const line = S.lines[S.cur]; const b = activeBlank(line);
@@ -384,33 +559,33 @@ function submitAnswer(value) {
     b.solved = true;
     const pts = Math.max(10, [100, 60, 30][Math.min(b.attempts, 2)] - b.hint * 25);
     S.streak++; S.score += pts + Math.min(S.streak - 1, 10) * 10;
-    setStatus(v === 'close' ? `Quase perfeito! Era "${b.answer}" (+${pts})` : `✔ Isso! +${pts}`, 'good');
-    flash('flash-ok');
+    setStatus(v === 'close' ? `Quase! Era “${b.answer}” · +${pts}` : `Isso! +${pts}`, 'good');
+    flash('flash-ok'); beep(true);
     $('#answer').value = '';
     if (!hasUnsolved(line)) { translateLine(line); if (S.waiting) resume(); }
   } else {
     b.attempts++; S.streak = 0;
-    flash('flash-bad');
+    flash('flash-bad'); beep(false);
     if (settings.mode === 'choice') b.removed.add(norm(value));
     if (b.attempts >= 3) {
       b.solved = true; b.missed = true;
-      setStatus(`A palavra era "${b.answer}". Ouça de novo 👂`, 'bad');
+      setStatus(`Era “${b.answer}” — ouça de novo`, 'bad');
       $('#answer').value = '';
       if (!hasUnsolved(line)) translateLine(line);
       replayLine();
     } else if (S.waiting) {
-      setStatus(`✘ "${value}" não é. Voltando a frase… (${b.attempts}/3)`, 'bad');
+      setStatus(`Não é “${value}” · voltando… ${b.attempts}/3`, 'bad');
       $('#answer').select();
-      setTimeout(() => { if (S.phase === 'play') replayLine(); }, 700);
+      setTimeout(() => { if (S.phase === 'play') replayLine(); }, 650);
     } else {
-      setStatus(`✘ "${value}" não é. (${b.attempts}/3)`, 'bad');
+      setStatus(`Não é “${value}” · ${b.attempts}/3`, 'bad');
       $('#answer').select();
     }
   }
   renderGame();
 }
 function giveHint() {
-  const line = S.lines[S.cur]; const b = activeBlank(line); if (!b) return;
+  const b = activeBlank(S.lines[S.cur]); if (!b) return;
   if (settings.mode === 'choice') {
     const wrong = (b.options || []).filter(o => norm(o) !== norm(b.answer) && !b.removed.has(norm(o)));
     if (wrong.length > 1) { b.removed.add(norm(wrong[0])); b.hint++; }
@@ -420,22 +595,17 @@ function giveHint() {
 function skipBlank() {
   const line = S.lines[S.cur]; if (!line) return;
   line.blanks.forEach(b => { if (!b.solved) { b.solved = true; b.missed = true; } });
-  S.streak = 0;
-  setStatus('Pulado.', '');
-  translateLine(line);
-  renderGame();
+  S.streak = 0; setStatus('Pulado', '');
+  translateLine(line); renderGame();
   if (S.waiting) resume();
 }
-
 function makeOptions(b) {
   const ans = norm(b.answer);
   const others = S.pool.filter(w => norm(w) !== ans);
   const close = shuffle(others.slice()).sort((x, y) => Math.abs(x.length - b.answer.length) - Math.abs(y.length - b.answer.length)).slice(0, 10);
-  const opts = shuffle(close).slice(0, 3);
-  opts.push(b.answer);
+  const opts = shuffle(close).slice(0, 3); opts.push(b.answer);
   return shuffle(opts);
 }
-
 function lineHTML(line, isCur) {
   if (!line) return '';
   const act = isCur ? activeBlank(line) : null;
@@ -444,152 +614,242 @@ function lineHTML(line, isCur) {
     if (!b) return esc(tk.raw);
     let inner;
     if (b.solved) inner = `<span class="${b.missed ? 'miss' : 'ok'}">${esc(b.answer)}</span>`;
-    else {
-      const shown = b.answer.slice(0, b.hint);
-      inner = `<span class="gap${b === act ? ' active' : ''}">${esc(shown)}${'_'.repeat(b.answer.length - shown.length)}</span>`;
-    }
+    else { const shown = b.answer.slice(0, b.hint); inner = `<span class="gap${b === act ? ' active' : ''}">${esc(shown)}${'_'.repeat(b.answer.length - shown.length)}</span>`; }
     return esc(tk.pre) + inner + esc(tk.post);
   }).join('');
   if (line.tr && !hasUnsolved(line)) h += `<div class="tr">${esc(line.tr)}</div>`;
   return h;
 }
+const DIRS = ['up', 'left', 'right', 'down'];
 function renderGame() {
   if (S.phase !== 'play') return;
   const i = S.cur, L = S.lines;
   $('#lPrev').innerHTML = lineHTML(L[i - 1], false);
-  $('#lCur').innerHTML = i < 0 ? '🎧 Prepare-se…' : lineHTML(L[i], true);
+  $('#lCur').innerHTML = i < 0 ? '<span class="muted">🎧 Prepare-se…</span>' : lineHTML(L[i], true);
   $('#lNext').innerHTML = lineHTML(L[i + 1], false);
   $('#hudScore').textContent = S.score; $('#hudStreak').textContent = S.streak;
   $('#progress').style.width = (L.length ? Math.max(0, (i + 1) / L.length * 100) : 0) + '%';
-  $('#offVal').textContent = (S.offset >= 0 ? '+' : '') + S.offset.toFixed(1) + 's';
   const b = activeBlank(L[i]);
-  $('#btnHint').disabled = $('#btnSkip').disabled = !b;
+  $('#gHint').disabled = $('#gSkip').disabled = !b;
   if (settings.mode === 'choice') {
-    const box = $('#choices');
-    if (!b) { box.innerHTML = ''; return; }
-    if (!b.options) b.options = makeOptions(b);
-    box.innerHTML = '';
-    b.options.forEach((o, k) => {
-      const btn = document.createElement('button');
-      btn.textContent = `${k + 1}. ${o}`;
-      if (b.removed.has(norm(o))) { btn.classList.add('wrong'); btn.disabled = true; }
-      btn.onclick = () => submitAnswer(o);
-      box.appendChild(btn);
+    if (b && !b.options) b.options = makeOptions(b);
+    $$('#pad .opt').forEach((btn, k) => {
+      const o = b && b.options[k];
+      const gone = o && b.removed.has(norm(o));
+      btn.textContent = o || '';
+      btn.className = `opt ${DIRS[k]}${o && o.length > 9 ? ' long' : ''}${gone ? ' wrong' : ''}`;
+      btn.disabled = !o || gone;
     });
   }
 }
-
 async function translateLine(line) {
   if (!settings.translate || settings.lang === 'pt' || line.tr) return;
   const key = settings.lang + '|' + line.text;
   if (trCache[key]) { line.tr = trCache[key]; renderGame(); return; }
   try {
-    const r = await fetch('https://api.mymemory.translated.net/get?' + new URLSearchParams({ q: line.text, langpair: settings.lang + '|pt-BR' }));
+    const r = await fetchT('https://api.mymemory.translated.net/get?' + new URLSearchParams({ q: line.text, langpair: settings.lang + '|pt-BR' }));
     const j = await r.json();
     const tx = j && j.responseData && j.responseData.translatedText;
-    if (tx && !/MYMEMORY WARNING|INVALID/i.test(tx)) {
-      const t = document.createElement('textarea'); t.innerHTML = tx; // decode entities
-      line.tr = t.value; trCache[key] = line.tr; store.set('lg:tr', trCache); renderGame();
-    }
+    if (tx && !/MYMEMORY WARNING|INVALID/i.test(tx)) { line.tr = decode(tx); trCache[key] = line.tr; store.set('lg:tr', trCache); renderGame(); }
   } catch { }
 }
-
 function finish() {
   S.finished = true;
   const all = S.lines.flatMap(l => l.blanks.map(b => ({ b, l })));
   const ok = all.filter(x => x.b.solved && !x.b.missed).length;
   const acc = all.length ? Math.round(ok / all.length * 100) : 0;
-  const song = songs[S.videoId] || {};
-  song.best = Math.max(song.best || 0, S.score); songs[S.videoId] = song; saveSongs(); renderSaved();
-  $('#rScore').textContent = S.score; $('#rAcc').textContent = acc + '%'; $('#rBest').textContent = song.best;
+  S.v.best = Math.max(S.v.best || 0, S.score); saveLib();
   const missed = all.filter(x => x.b.missed || x.b.attempts > 0);
-  $('#rMissedWrap').classList.toggle('hidden', !missed.length);
-  $('#rMissed').innerHTML = missed.map(x => `<li><b>${esc(x.b.answer)}</b> — ${esc(x.l.text)}${x.l.tr ? `<br><span class="tr">${esc(x.l.tr)}</span>` : ''}</li>`).join('');
-  $('#resultsModal').classList.remove('hidden');
-}
-function quitGame() {
-  if (playerReady) player.pauseVideo();
-  S.phase = 'ready'; show('readyCard'); renderReady();
+  const hasNext = S.queue && S.queue.idx + 1 < S.queue.ids.length;
+  openSheet(`<h3>🎉 Fim da música!</h3>
+    <div class="stats"><div><b>${S.score}</b><span>pontos</span></div><div><b>${acc}%</b><span>acertos</span></div><div><b>${S.v.best}</b><span>recorde</span></div></div>
+    ${missed.length ? `<p class="muted">Palavras para revisar</p><ul class="missed">${missed.map(x => `<li><b>${esc(x.b.answer)}</b> — ${esc(x.l.text)}${x.l.tr ? `<div class="tr">${esc(x.l.tr)}</div>` : ''}</li>`).join('')}</ul>` : '<p class="muted" style="text-align:center">Perfeito, nenhum erro! 🏆</p>'}
+    <div class="chips center">
+      ${hasNext ? '<button class="btn primary" data-a="next">Próxima música ▶</button>' : ''}
+      <button class="btn ${hasNext ? '' : 'primary'}" data-a="again">Jogar de novo</button>
+      <button class="btn" data-a="close">Fechar</button>
+    </div>`, {
+    next: () => { const q = { ...S.queue, idx: S.queue.idx + 1 }; closeSheet(); endPlay(); openSong(q.ids[q.idx], lib.videos[q.ids[q.idx]], q); },
+    again: () => { closeSheet(); startGame(); },
+    close: () => { closeSheet(); quitGame(); }
+  });
 }
 
-/* ---------- wiring ---------- */
-$('#loadBtn').onclick = () => {
-  const id = parseVideoId($('#url').value);
-  if (!id) { alert('Link do YouTube inválido.'); return; }
-  loadVideo(id);
+/* ================= sheets ================= */
+function openSheet(html, actions = {}) {
+  $('#sheetContent').innerHTML = html;
+  $$('#sheetContent [data-a]').forEach(el => { const f = actions[el.dataset.a]; if (f) el.addEventListener('click', e => f(e, el)); });
+  $('#sheet').classList.remove('hidden');
+}
+function closeSheet() { $('#sheet').classList.add('hidden'); }
+$('#sheetBg').onclick = closeSheet;
+
+function seg(name, opts, value) {
+  return `<div class="seg small" data-seg="${name}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(v) === String(value) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+}
+function sheetSettings() {
+  const inSong = document.body.dataset.view === 'song' && S.entries.length;
+  openSheet(`<h3>Configurações</h3>
+    <div class="field"><label>Dificuldade</label>${seg('difficulty', [['facil', 'Fácil'], ['medio', 'Médio'], ['dificil', 'Difícil']], settings.difficulty)}</div>
+    <div class="field"><label>Responder</label>${seg('mode', [['choice', 'Múltipla escolha'], ['type', 'Digitando']], settings.mode)}</div>
+    <div class="field"><label>Se eu demorar, repetir o trecho</label>${seg('autoReplay', [[0, 'Nunca'], [5, '5s'], [8, '8s'], [12, '12s'], [20, '20s']], settings.autoReplay)}</div>
+    <div class="field"><label>Velocidade</label>${seg('speed', [[0.5, '0.5x'], [0.75, '0.75x'], [1, '1x']], settings.speed)}</div>
+    <div class="field"><label>Idioma das músicas</label>${seg('lang', [['en', 'EN'], ['es', 'ES'], ['fr', 'FR'], ['it', 'IT'], ['de', 'DE'], ['pt', 'PT']], settings.lang)}</div>
+    <div class="toggle">Tradução PT-BR após completar<button class="switch ${settings.translate ? 'on' : ''}" data-t="translate"></button></div>
+    <div class="toggle">Sons de acerto/erro<button class="switch ${settings.sounds ? 'on' : ''}" data-t="sounds"></button></div>
+    ${inSong ? `<div class="field"><label>Sincronia desta música</label><div class="toggle"><span class="muted">Use − se a letra aparece antes da voz</span><div class="stepper"><button data-a="offm">−</button><span id="offVal">${(S.offset >= 0 ? '+' : '') + S.offset.toFixed(1)}s</span><button data-a="offp">+</button></div></div></div>` : ''}
+    <div class="field"><label>Busca de vídeos</label>
+      <input id="ytKey" placeholder="Chave da API do YouTube (opcional)" value="${esc(settings.ytKey)}" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <p class="muted" style="font-size:12px">Sem chave, a busca usa servidores gratuitos que às vezes ficam fora do ar. Com uma chave grátis (Google Cloud → YouTube Data API v3) a busca fica estável.</p></div>
+    <div class="field"><label>Biblioteca (favoritos, playlists, letras)</label>
+      <div class="chips"><button class="chip" data-a="export">Copiar backup</button><button class="chip" data-a="import">Restaurar backup</button></div>
+      <textarea id="ioBox" rows="4" class="hidden" placeholder="Cole aqui o backup e toque Restaurar"></textarea>
+      <p class="muted" style="font-size:12px">Use para levar suas músicas do PC para o iPhone (ou do Safari para o app da Tela de Início).</p></div>
+    <button class="btn primary wide" data-a="done">Pronto</button>`, {
+    offm: () => nudge(-0.2), offp: () => nudge(0.2),
+    export: async () => {
+      const txt = JSON.stringify(lib); const box = $('#ioBox'); box.classList.remove('hidden'); box.value = txt; box.select();
+      try { await navigator.clipboard.writeText(txt); toast('Backup copiado ✓'); } catch { toast('Selecione e copie o texto'); }
+    },
+    import: () => {
+      const box = $('#ioBox');
+      if (box.classList.contains('hidden') || !box.value.trim().startsWith('{')) { box.classList.remove('hidden'); box.value = ''; box.focus(); toast('Cole o backup e toque Restaurar de novo'); return; }
+      try { importLib(JSON.parse(box.value)); toast('Biblioteca restaurada ✓'); closeSheet(); renderHome(); } catch { toast('Backup inválido'); }
+    },
+    done: () => { settings.ytKey = ($('#ytKey').value || '').trim(); saveSettings(); closeSheet(); if (S.phase === 'ready') renderReady(); }
+  });
+  $$('#sheetContent [data-seg]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => {
+    const k = g.dataset.seg; let v = b.dataset.v; if (['autoReplay', 'speed'].includes(k)) v = +v;
+    settings[k] = v; saveSettings();
+    g.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    if (k === 'mode' && S.phase === 'play') { applyMode(); renderGame(); }
+    if (k === 'speed' && playerReady) { player.setPlaybackRate(v); $('#gSpeed').innerHTML = `<b>${v}x</b><span>Velocidade</span>`; }
+    if (S.phase === 'ready') renderReady();
+  }));
+  $$('#sheetContent [data-t]').forEach(b => b.onclick = () => { const k = b.dataset.t; settings[k] = !settings[k]; saveSettings(); b.classList.toggle('on', settings[k]); });
+  $('#ytKey').addEventListener('change', e => { settings.ytKey = e.target.value.trim(); saveSettings(); });
+}
+function nudge(d) {
+  S.offset = Math.round((S.offset + d) * 10) / 10;
+  if (S.v) { S.v.offset = S.offset; saveLib(); }
+  const el = $('#offVal'); if (el) el.textContent = (S.offset >= 0 ? '+' : '') + S.offset.toFixed(1) + 's';
+}
+function importLib(data) {
+  if (!data || !data.videos) throw new Error('bad');
+  for (const [id, v] of Object.entries(data.videos)) {
+    const cur = lib.videos[id];
+    if (!cur) lib.videos[id] = v;
+    else { if (!cur.lrc && v.lrc) { cur.lrc = v.lrc; cur.offset = v.offset; } cur.fav = cur.fav || v.fav; cur.best = Math.max(cur.best || 0, v.best || 0); cur.title = cur.title || v.title; cur.author = cur.author || v.author; }
+  }
+  (data.playlists || []).forEach(p => {
+    const cur = lib.playlists.find(x => x.id === p.id);
+    if (!cur) lib.playlists.push(p); else p.items.forEach(i => { if (!cur.items.includes(i)) cur.items.push(i); });
+  });
+  lib.recent = [...new Set([...lib.recent, ...(data.recent || [])])].slice(0, 50);
+  saveLib();
+}
+function sheetAddToPlaylist(v) {
+  vid(v.id, v);
+  const render = () => {
+    openSheet(`<h3>Adicionar à playlist</h3>
+      <div class="list">${lib.playlists.map(p => `<div class="item" data-a="tog" data-id="${p.id}"><div class="meta"><b>${esc(p.name)}</b><small>${p.items.length} músicas</small></div><span class="check ${p.items.includes(v.id) ? 'on' : ''}">${p.items.includes(v.id) ? icon('check') : ''}</span></div>`).join('') || '<p class="muted" style="text-align:center">Nenhuma playlist ainda.</p>'}</div>
+      <div class="row2" style="margin-top:12px"><input id="newPl" placeholder="Nova playlist…"><button class="btn primary" data-a="new">Criar</button></div>
+      <button class="btn wide" data-a="done">Pronto</button>`, {
+      tog: (e, el) => { const p = lib.playlists.find(x => x.id === el.dataset.id); const i = p.items.indexOf(v.id); i >= 0 ? p.items.splice(i, 1) : p.items.push(v.id); saveLib(); render(); },
+      new: () => { const n = $('#newPl').value.trim(); if (!n) return; lib.playlists.push({ id: uid(), name: n, items: [v.id] }); saveLib(); toast('Adicionada em “' + n + '”'); render(); },
+      done: () => { closeSheet(); renderHome(); }
+    });
+  };
+  render();
+}
+function sheetNewPlaylist() {
+  openSheet(`<h3>Nova playlist</h3><input id="newPl" placeholder="Nome da playlist"><button class="btn primary wide" data-a="ok">Criar</button>`, {
+    ok: () => { const n = $('#newPl').value.trim(); if (!n) return; const p = { id: uid(), name: n, items: [] }; lib.playlists.push(p); saveLib(); closeSheet(); H.plOpen = p.id; renderHome(); }
+  });
+  setTimeout(() => $('#newPl').focus(), 100);
+}
+function sheetPlaylistMenu(pl) {
+  openSheet(`<h3>${esc(pl.name)}</h3><input id="plName" value="${esc(pl.name)}">
+    <button class="btn primary wide" data-a="ren">Renomear</button><button class="btn wide" data-a="del" style="color:var(--bad)">Excluir playlist</button>`, {
+    ren: () => { const n = $('#plName').value.trim(); if (n) { pl.name = n; saveLib(); } closeSheet(); renderHome(); },
+    del: () => { if (confirm('Excluir a playlist “' + pl.name + '”? As músicas continuam salvas.')) { lib.playlists = lib.playlists.filter(p => p !== pl); H.plOpen = null; saveLib(); closeSheet(); renderHome(); } }
+  });
+}
+
+/* ================= wiring ================= */
+$('#searchForm').onsubmit = e => { e.preventDefault(); doSearch($('#q').value); };
+$('#q').addEventListener('search', () => { if (!$('#q').value && H.results) { H.results = null; renderHome(); } });
+$$('#homeTabs button').forEach(b => b.onclick = () => { H.tab = b.dataset.tab; H.results = null; H.plOpen = null; renderHome(); });
+$('#btnSettings').onclick = sheetSettings;
+$('#btnFull').onclick = () => {
+  const el = document.documentElement;
+  if (el.requestFullscreen && !isIOS) { document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen().catch(() => { }); }
+  else { $('#installHint').classList.remove('hidden'); toast('No iPhone: Compartilhar → Adicionar à Tela de Início'); }
 };
-$('#url').addEventListener('keydown', e => { if (e.key === 'Enter') $('#loadBtn').click(); });
-document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
-  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('active', x === b));
-  $('#tab-search').classList.toggle('hidden', b.dataset.tab !== 'search');
-  $('#tab-paste').classList.toggle('hidden', b.dataset.tab !== 'paste');
+if (isStandalone) $('#btnFull').classList.add('hidden');
+if (isIOS && !isStandalone && !store.get('lg:hintClosed', false)) $('#installHint').classList.remove('hidden');
+$('#installClose').onclick = () => { $('#installHint').classList.add('hidden'); store.set('lg:hintClosed', true); };
+
+$('#btnBack').onclick = () => { if (history.state && history.state.song) history.back(); else go('home'); };
+$('#btnFav').onclick = () => { toggleFav(S.v); updateSongBar(); };
+$('#btnAddPl').onclick = () => sheetAddToPlaylist(S.v);
+
+$$('#lyrTabs button').forEach(b => b.onclick = () => {
+  $$('#lyrTabs button').forEach(x => x.classList.toggle('on', x === b));
+  $('#lyrSearch').classList.toggle('hidden', b.dataset.tab !== 'search');
+  $('#lyrPaste').classList.toggle('hidden', b.dataset.tab !== 'paste');
 });
-$('#searchBtn').onclick = searchLyrics;
-$('#pasteBtn').onclick = () => {
-  const txt = $('#pasteBox').value;
-  const lrc = parseLRC(txt);
-  if (lrc) setEntries(lrc, true); else startSync(plainLines(txt));
-};
+$('#lrcSearchBtn').onclick = searchLyrics;
+$('#pasteBtn').onclick = () => { const txt = $('#pasteBox').value; const lrc = parseLRC(txt); if (lrc) setEntries(lrc, true); else startSync(plainLines(txt)); };
 
 $('#sMark').onclick = syncMark;
 $('#sUndo').onclick = syncUndo;
 $('#sGap').onclick = syncGap;
 $('#sPlay').onclick = () => { if (!playerReady) return; player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo(); };
-$('#sSpeed').onchange = e => playerReady && player.setPlaybackRate(+e.target.value);
-$('#sCancel').onclick = () => { if (playerReady) player.pauseVideo(); if (S.entries.length) { S.phase = 'ready'; show('readyCard'); } else { S.phase = 'lyrics'; show('lyricsCard'); } };
+$('#sSpeed').onclick = e => { const r = { 1: 0.75, 0.75: 0.5, 0.5: 1 }[e.target.dataset.r || 1]; e.target.dataset.r = r; e.target.textContent = r + 'x'; playerReady && player.setPlaybackRate(r); };
+$('#sCancel').onclick = () => { if (playerReady) player.pauseVideo(); if (S.entries.length) { S.phase = 'ready'; showPane('pReady'); renderReady(); } else { S.phase = 'lyrics'; showPane('pLyrics'); } };
 
-$('#optDiff').onchange = e => { settings.difficulty = e.target.value; saveSettings(); };
-$('#optMode').onchange = e => { settings.mode = e.target.value; saveSettings(); };
-$('#optSpeed').onchange = e => { settings.speed = +e.target.value; saveSettings(); };
-$('#optLang').onchange = e => { settings.lang = e.target.value; saveSettings(); };
-$('#optTr').onchange = e => { settings.translate = e.target.checked; saveSettings(); };
-$('#optAuto').onchange = e => { settings.autoReplay = +e.target.value; saveSettings(); };
-// typing / tapping while waiting resets the auto-replay timer
-['input', 'pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { S.lastActivity = Date.now(); const r = $('#replayIn'); if (r) r.textContent = ''; }, true));
 $('#playBtn').onclick = startGame;
 $('#resyncBtn').onclick = () => startSync(S.entries.filter(e => e.text).map(e => e.text));
 $('#editBtn').onclick = () => $('#editBox').classList.toggle('hidden');
-$('#changeBtn').onclick = () => { S.phase = 'lyrics'; show('lyricsCard'); };
-$('#lrcSave').onclick = () => { const e = parseLRC($('#lrcBox').value); if (!e) { alert('LRC inválido.'); return; } S.entries = e; saveSong(); renderReady(); alert('Salvo!'); };
-$('#lrcCopy').onclick = () => { navigator.clipboard?.writeText($('#lrcBox').value); };
+$('#changeBtn').onclick = () => { S.phase = 'lyrics'; showPane('pLyrics'); prefillLyrics(); };
+$('#lrcSave').onclick = () => { const e = parseLRC($('#lrcBox').value); if (!e) { toast('LRC inválido'); return; } S.entries = e; saveSong(); renderReady(); toast('Salvo ✓'); };
+$('#lrcCopy').onclick = async () => { try { await navigator.clipboard.writeText($('#lrcBox').value); toast('Copiado ✓'); } catch { } };
 
 $('#answerForm').onsubmit = e => { e.preventDefault(); submitAnswer($('#answer').value); };
-$('#btnReplay').onclick = () => { setStatus('🔁 Ouvindo de novo…', 'info'); replayLine(); };
-$('#btnHint').onclick = giveHint;
-$('#btnSkip').onclick = skipBlank;
-$('#btnPause').onclick = () => {
-  if (S.waiting) return replayLine();
-  player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo();
-};
-const nudge = d => { S.offset = Math.round((S.offset + d) * 10) / 10; if (songs[S.videoId]) { songs[S.videoId].offset = S.offset; saveSongs(); } renderGame(); };
-$('#offMinus').onclick = () => nudge(-0.2);
-$('#offPlus').onclick = () => nudge(0.2);
-$('#gSpeed').onchange = e => { settings.speed = +e.target.value; saveSettings(); player.setPlaybackRate(settings.speed); };
-$('#btnQuit').onclick = quitGame;
-$('#rAgain').onclick = startGame;
-$('#rClose').onclick = () => { $('#resultsModal').classList.add('hidden'); quitGame(); };
+$$('#pad .opt').forEach(btn => btn.onclick = () => { if (btn.textContent) submitAnswer(btn.textContent); });
+$$('.replayBtn').forEach(b => b.onclick = () => { setStatus('🔁 Ouvindo de novo…', 'info'); replayLine(); });
+$('#gHint').onclick = giveHint;
+$('#gSkip').onclick = skipBlank;
+$('#gPause').onclick = () => { if (S.waiting) return replayLine(); player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo(); };
+$('#gSpeed').onclick = () => { settings.speed = { 1: 0.75, 0.75: 0.5, 0.5: 1 }[settings.speed] || 1; saveSettings(); player.setPlaybackRate(settings.speed); $('#gSpeed').innerHTML = `<b>${settings.speed}x</b><span>Velocidade</span>`; };
+$('#gQuit').onclick = quitGame;
+$('#gSet').onclick = sheetSettings;
+
+['input', 'pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { S.lastActivity = Date.now(); if (S.waiting) setRing(0); }, true));
+document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && S.phase === 'play' && !wakeLock) { try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { } } });
 
 document.addEventListener('keydown', e => {
   const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  if (e.key === 'Escape' && !$('#sheet').classList.contains('hidden')) { closeSheet(); return; }
   if (S.phase === 'sync' && !typing) {
     if (e.code === 'Space') { e.preventDefault(); syncMark(); }
     else if (e.key === 'Backspace') { e.preventDefault(); syncUndo(); }
   }
   if (S.phase === 'play') {
-    if (settings.mode === 'choice' && /^[1-4]$/.test(e.key) && !typing) {
-      const b = activeBlank(S.lines[S.cur]); const o = b && b.options && b.options[+e.key - 1];
-      if (o && !b.removed.has(norm(o))) submitAnswer(o);
+    if (settings.mode === 'choice' && !typing) {
+      const k = { ArrowUp: 0, ArrowLeft: 1, ArrowRight: 2, ArrowDown: 3, 1: 0, 2: 1, 3: 2, 4: 3 }[e.key];
+      if (k != null) { e.preventDefault(); const btn = $$('#pad .opt')[k]; if (btn && !btn.disabled) btn.click(); }
+      if (e.code === 'Space') { e.preventDefault(); replayLine(); }
     }
     if (e.key === 'Escape') { e.preventDefault(); replayLine(); }
   }
 });
 
-/* ---------- init ---------- */
-if (location.protocol === 'file:') $('#fileWarn').classList.remove('hidden');
+/* ================= init ================= */
 (function init() {
   const q = new URLSearchParams(location.search).get('v');
-  const id = parseVideoId(q || '') || store.get('lg:last', null) || parseVideoId(DEFAULT_URL);
-  $('#url').value = 'https://www.youtube.com/watch?v=' + id;
-  renderSaved();
-  loadVideo(id);
+  renderHome();
+  const id = parseVideoId(q || '');
+  if (id) openSong(id, null);
 })();
