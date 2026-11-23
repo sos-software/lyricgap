@@ -492,7 +492,7 @@ function applyMode() {
 async function startGame() {
   if (!playerReady) { toast('O vídeo ainda está carregando…'); return; }
   buildGame();
-  Object.assign(S, { phase: 'play', cur: -1, hold: null, waiting: false, finished: false, score: 0, streak: 0 });
+  Object.assign(S, { phase: 'play', cur: -1, maxCur: -1, backAt: 0, backTarget: null, hold: null, waiting: false, finished: false, score: 0, streak: 0 });
   showPane('pGame'); document.body.classList.add('playing'); closeSheet();
   applyMode();
   $('#gSpeed').innerHTML = `<b>${settings.speed}x</b><span>Velocidade</span>`;
@@ -528,7 +528,9 @@ function currentIdx(L) {
   return idx;
 }
 function enterLine(idx) {
+  if (S.backTarget != null && idx >= S.maxCur && Date.now() - S.backAt > 300) { S.backTarget = null; setStatus('', ''); } // caught up again
   S.cur = idx;
+  S.maxCur = Math.max(S.maxCur, idx);
   const line = S.lines[idx];
   if (line) translateLine(line);   // prefetch so it's ready when the line becomes "previous"
   renderGame();
@@ -589,6 +591,20 @@ function replayLine() {
   const line = S.lines[S.cur]; if (!line) { seekLyric(0); player.playVideo(); return; }
   S.waiting = false; S.hold = S.cur;
   seekLyric(line.t - 0.8); player.playVideo();
+}
+/* Back button: jump to the previous verse; quick repeated taps keep going back. The music continues from there. */
+function goBackVerse() {
+  if (!playerReady || S.phase !== 'play' || !S.lines.length) return;
+  const now = Date.now();
+  const from = (now - S.backAt < 2500 && S.backTarget != null) ? S.backTarget : Math.max(0, S.cur);
+  const target = Math.max(0, from - 1);
+  S.backAt = now; S.backTarget = target;
+  S.waiting = false; setRing(0);
+  S.hold = target;
+  seekLyric(S.lines[target].t - 0.3);
+  player.playVideo();
+  enterLine(target);
+  setStatus(`⏮ Verso ${target + 1} de ${S.lines.length}`, 'info');
 }
 function resume() { S.waiting = false; setRing(0); player.playVideo(); }
 
@@ -692,7 +708,11 @@ function renderGame() {
   const prev = L[i - 1];
   $('#lPrev').innerHTML = prev ? lineHTML(prev, false, true) + bmBtn(!!findPhrase(S.videoId, prev.text), `data-bm="${i - 1}"`) : '';
   $('#lPrev').classList.toggle('empty', !prev);
-  $('#lCur').innerHTML = i < 0 ? '<span class="muted">🎧 Prepare-se…</span>' : lineHTML(L[i], true, false);
+  // a verse revisited with the back button shows its answers + translation (nothing left to answer)
+  const revisit = i >= 0 && i < S.maxCur && !hasUnsolved(L[i]);
+  $('#lCur').innerHTML = i < 0 ? '<span class="muted">🎧 Prepare-se…</span>'
+    : lineHTML(L[i], true, revisit) + (revisit ? ' ' + bmBtn(!!findPhrase(S.videoId, L[i].text), `data-bm="${i}" style="position:static;transform:none;display:inline-grid;vertical-align:middle"`) : '');
+  $('#gBack').disabled = S.cur <= 0 && S.backTarget == null;
   $('#gSkip').classList.toggle('hidden', settings.pace === 'flow');
   $('#hudScore').textContent = S.score; $('#hudStreak').textContent = S.streak;
   $('#progress').style.width = (L.length ? Math.max(0, (i + 1) / L.length * 100) : 0) + '%';
@@ -938,7 +958,8 @@ $('#changeBtn').onclick = () => { S.phase = 'lyrics'; showPane('pLyrics'); prefi
 $('#lrcSave').onclick = () => { const e = parseLRC($('#lrcBox').value); if (!e) { toast('LRC inválido'); return; } S.entries = e; saveSong(); renderReady(); toast('Salvo ✓'); };
 $('#lrcCopy').onclick = async () => { try { await navigator.clipboard.writeText($('#lrcBox').value); toast('Copiado ✓'); } catch { } };
 
-$('#lPrev').addEventListener('click', e => { const b = e.target.closest('[data-bm]'); if (b) toggleSavePhrase(S.lines[+b.dataset.bm]); });
+['#lPrev', '#lCur'].forEach(sel => $(sel).addEventListener('click', e => { const b = e.target.closest('[data-bm]'); if (b) toggleSavePhrase(S.lines[+b.dataset.bm]); }));
+$('#gBack').onclick = goBackVerse;
 $('#answerForm').onsubmit = e => { e.preventDefault(); submitAnswer($('#answer').value); };
 $$('#pad .opt').forEach(btn => btn.onclick = () => { if (btn.textContent) submitAnswer(btn.textContent); });
 $$('.replayBtn').forEach(b => b.onclick = () => { setStatus('🔁 Ouvindo de novo…', 'info'); replayLine(); });
@@ -966,6 +987,7 @@ document.addEventListener('keydown', e => {
       if (e.code === 'Space') { e.preventDefault(); replayLine(); }
     }
     if (e.key === 'Escape') { e.preventDefault(); replayLine(); }
+    if (e.key === 'Backspace' && !typing) { e.preventDefault(); goBackVerse(); }
   }
 });
 
