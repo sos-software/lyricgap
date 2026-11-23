@@ -99,6 +99,13 @@ textarea{resize:vertical;margin-top:4px}
 .gap{display:inline-block;border-bottom:3px solid var(--muted);color:var(--warn);letter-spacing:2px;padding:0 2px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.88em;line-height:1.1}
 .gap.active{border-color:var(--warn);animation:pulse 1.2s infinite}
 @keyframes pulse{50%{border-color:transparent}}
+.lyrics.game{justify-content:flex-start;gap:0;min-height:0;padding:12px 0 4px}
+.prevcard{background:var(--s1);border-radius:14px;padding:9px 14px;font-size:14px;line-height:1.4;color:var(--muted);min-height:62px;text-align:center;transition:opacity .25s}
+.prevcard .tr{font-size:13px;margin-top:2px}
+.prevcard.empty{opacity:0}
+.prevcard .ok{color:color-mix(in srgb,var(--ok) 75%,var(--muted))}
+.lyrics.game .line.cur{min-height:96px;padding:18px 4px 0}
+.reveal{color:var(--text);opacity:.55;border-bottom:2px dotted var(--muted)}
 .ok{color:var(--ok)}
 .miss{color:var(--bad);text-decoration:underline;text-decoration-thickness:2px}
 .flash-ok{animation:fok .6s}

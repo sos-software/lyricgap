@@ -24,7 +24,7 @@ const icon = (name, cls = '') => `<svg class="${cls}"><use href="#i-${name}"/></
 
 /* ================= settings & library ================= */
 const settings = Object.assign(
-  { difficulty: 'medio', mode: isTouch ? 'choice' : 'type', speed: 1, translate: true, lang: 'en', autoReplay: 8, sounds: true, ytKey: '', pipedOk: '' },
+  { pace: 'flow', difficulty: 'medio', mode: isTouch ? 'choice' : 'type', speed: 1, translate: true, lang: 'en', autoReplay: 8, sounds: true, ytKey: '', pipedOk: '' },
   store.get('lg:settings', {})
 );
 const saveSettings = () => store.set('lg:settings', settings);
@@ -375,8 +375,10 @@ const DIFF_LABEL = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' };
 function renderReady() {
   const n = S.entries.filter(e => e.text).length;
   const best = S.v && S.v.best;
-  $('#readyInfo').innerHTML = `${n} frases${best ? ' · recorde <b>' + best + '</b>' : ''}<br>O vídeo pausa no fim de cada frase com lacuna.`;
-  const chips = [DIFF_LABEL[settings.difficulty], settings.mode === 'choice' ? 'Escolha' : 'Digitando', settings.speed + 'x', settings.autoReplay ? 'Repete em ' + settings.autoReplay + 's' : 'Sem repetição auto'];
+  $('#readyInfo').innerHTML = `${n} frases${best ? ' · recorde <b>' + best + '</b>' : ''}<br>` + (settings.pace === 'flow'
+    ? 'A música não para: responda enquanto o verso toca. Quanto mais rápido, mais pontos.'
+    : 'O vídeo pausa no fim de cada frase com lacuna.');
+  const chips = [settings.pace === 'flow' ? '🌊 Fluxo' : '⏸ Pausa', DIFF_LABEL[settings.difficulty], settings.mode === 'choice' ? 'Escolha' : 'Digitando', settings.speed + 'x'];
   $('#readyChips').innerHTML = chips.map(c => `<button class="chip">${esc(c)}</button>`).join('');
   $$('#readyChips .chip').forEach(c => c.onclick = sheetSettings);
   $('#lrcBox').value = toLRC(S.entries);
@@ -505,10 +507,45 @@ function setStatus(msg, cls = '') { const el = $('#status'); el.textContent = ms
 function flash(cls) { const el = $('#lCur'); el.classList.remove('flash-ok', 'flash-bad'); void el.offsetWidth; el.classList.add(cls); }
 function setRing(frac) { $$('.replayBtn .ring circle').forEach(c => c.style.strokeDashoffset = 226 * (1 - Math.max(0, Math.min(1, frac)))); }
 
+function currentIdx(L) {
+  let idx = -1;
+  for (let i = 0; i < S.lines.length; i++) { if (S.lines[i].t <= L) idx = i; else break; }
+  if (S.hold != null) {          // pre-roll before a replayed line: keep showing it
+    const h = S.lines[S.hold];
+    if (L < h.t - 2 || L > h.end) S.hold = null; else if (L < h.t) idx = S.hold; else S.hold = null;
+  }
+  return idx;
+}
+function enterLine(idx) {
+  S.cur = idx;
+  const line = S.lines[idx];
+  if (line) translateLine(line);   // prefetch so it's ready when the line becomes "previous"
+  renderGame();
+}
+function checkFinish(idx, L) {
+  const last = S.lines[S.lines.length - 1];
+  if (!S.finished && last && idx === S.lines.length - 1 && !hasUnsolved(last) && L > last.end + 3) finish();
+}
+/* Flow mode: the music never stops. Unanswered gaps are revealed quietly when the line ends. */
+function tickFlow(L) {
+  const idx = currentIdx(L);
+  if (idx > S.cur) {
+    for (let i = Math.max(0, S.cur); i < idx; i++) {
+      S.lines[i].blanks.forEach(b => { if (!b.solved) { b.solved = true; b.missed = true; b.soft = true; S.streak = 0; } });
+    }
+  }
+  if (idx !== S.cur) enterLine(idx);
+  const line = S.lines[S.cur];
+  setRing(line && hasUnsolved(line) ? 1 - (L - line.t) / Math.max(0.5, line.end - line.t) : 0);
+  const last = S.lines[S.lines.length - 1];
+  if (last && S.cur === S.lines.length - 1 && L > last.end) last.blanks.forEach(b => { if (!b.solved) { b.solved = b.missed = b.soft = true; renderGame(); } });
+  checkFinish(idx, L);
+}
 function tick() {
   if (S.phase !== 'play' || !playerReady) return;
   const st = player.getPlayerState();
   const L = lyricTime();
+  if (settings.pace === 'flow') return tickFlow(L);
   const cur = S.lines[S.cur];
   if (cur && hasUnsolved(cur) && st === YT.PlayerState.PLAYING && L >= cur.end - 0.15 && L < cur.end + 1.5) { pauseForAnswer(); return; }
   if (S.waiting) {
@@ -523,15 +560,9 @@ function tick() {
       return;
     }
   }
-  let idx = -1;
-  for (let i = 0; i < S.lines.length; i++) { if (S.lines[i].t <= L) idx = i; else break; }
-  if (S.hold != null) {
-    const h = S.lines[S.hold];
-    if (L < h.t - 2 || L > h.end) S.hold = null; else if (L < h.t) idx = S.hold; else S.hold = null;
-  }
-  if (idx !== S.cur) { S.cur = idx; renderGame(); }
-  const last = S.lines[S.lines.length - 1];
-  if (!S.finished && last && idx === S.lines.length - 1 && !hasUnsolved(last) && L > last.end + 3) finish();
+  const idx = currentIdx(L);
+  if (idx !== S.cur) enterLine(idx);
+  checkFinish(idx, L);
 }
 setInterval(tick, 50);
 
@@ -555,6 +586,7 @@ function submitAnswer(value) {
   if (!b) return;
   const v = judge(value, b.answer);
   if (v === 'empty') return;
+  if (settings.pace === 'flow') return submitFlow(line, b, v, value);
   if (v === 'exact' || v === 'close') {
     b.solved = true;
     const pts = Math.max(10, [100, 60, 30][Math.min(b.attempts, 2)] - b.hint * 25);
@@ -584,6 +616,26 @@ function submitAnswer(value) {
   }
   renderGame();
 }
+/* Flow: no rewinds, no red, no buzzer. Right = points (faster = more). Wrong = quietly revealed. */
+function submitFlow(line, b, v, value) {
+  if (v === 'exact' || v === 'close') {
+    b.solved = true;
+    const L = lyricTime();
+    const speed = Math.max(0, Math.min(1, 1 - (L - line.t) / Math.max(0.5, line.end - line.t)));
+    const pts = Math.max(10, 50 + Math.round(speed * 50) - b.hint * 20 - b.attempts * 15);
+    S.streak++; S.score += pts + Math.min(S.streak - 1, 10) * 5;
+    setStatus(S.streak >= 3 ? `+${pts} · 🔥${S.streak}` : `+${pts}`, 'good');
+    flash('flash-ok'); beep(true);
+    $('#answer').value = '';
+  } else if (settings.mode === 'choice') {
+    b.solved = true; b.missed = true; b.soft = true; S.streak = 0;
+    setStatus('', '');
+  } else {
+    b.attempts++;            // typing: let the player try again until the line ends
+    $('#answer').value = '';
+  }
+  renderGame();
+}
 function giveHint() {
   const b = activeBlank(S.lines[S.cur]); if (!b) return;
   if (settings.mode === 'choice') {
@@ -599,40 +651,44 @@ function skipBlank() {
   translateLine(line); renderGame();
   if (S.waiting) resume();
 }
-function makeOptions(b) {
+function makeOptions(b, line) {
   const ans = norm(b.answer);
-  const others = S.pool.filter(w => norm(w) !== ans);
+  const inLine = new Set(line ? line.tokens.filter(t => t.word).map(t => norm(t.core)) : []);
+  let others = S.pool.filter(w => norm(w) !== ans && !inLine.has(norm(w)));
+  if (others.length < 3) others = S.pool.filter(w => norm(w) !== ans);
   const close = shuffle(others.slice()).sort((x, y) => Math.abs(x.length - b.answer.length) - Math.abs(y.length - b.answer.length)).slice(0, 10);
   const opts = shuffle(close).slice(0, 3); opts.push(b.answer);
   return shuffle(opts);
 }
-function lineHTML(line, isCur) {
+function lineHTML(line, isCur, withTr) {
   if (!line) return '';
   const act = isCur ? activeBlank(line) : null;
   let h = line.tokens.map((tk, i) => {
     const b = line.blankMap[i];
     if (!b) return esc(tk.raw);
     let inner;
-    if (b.solved) inner = `<span class="${b.missed ? 'miss' : 'ok'}">${esc(b.answer)}</span>`;
+    if (b.solved) inner = `<span class="${b.soft ? 'reveal' : b.missed ? 'miss' : 'ok'}">${esc(b.answer)}</span>`;
     else { const shown = b.answer.slice(0, b.hint); inner = `<span class="gap${b === act ? ' active' : ''}">${esc(shown)}${'_'.repeat(b.answer.length - shown.length)}</span>`; }
     return esc(tk.pre) + inner + esc(tk.post);
   }).join('');
-  if (line.tr && !hasUnsolved(line)) h += `<div class="tr">${esc(line.tr)}</div>`;
+  if (withTr && line.tr && settings.translate) h += `<div class="tr">${esc(line.tr)}</div>`;
   return h;
 }
 const DIRS = ['up', 'left', 'right', 'down'];
 function renderGame() {
   if (S.phase !== 'play') return;
   const i = S.cur, L = S.lines;
-  $('#lPrev').innerHTML = lineHTML(L[i - 1], false);
-  $('#lCur').innerHTML = i < 0 ? '<span class="muted">🎧 Prepare-se…</span>' : lineHTML(L[i], true);
-  $('#lNext').innerHTML = lineHTML(L[i + 1], false);
+  const prev = L[i - 1];
+  $('#lPrev').innerHTML = prev ? lineHTML(prev, false, true) : '';
+  $('#lPrev').classList.toggle('empty', !prev);
+  $('#lCur').innerHTML = i < 0 ? '<span class="muted">🎧 Prepare-se…</span>' : lineHTML(L[i], true, false);
+  $('#gSkip').classList.toggle('hidden', settings.pace === 'flow');
   $('#hudScore').textContent = S.score; $('#hudStreak').textContent = S.streak;
   $('#progress').style.width = (L.length ? Math.max(0, (i + 1) / L.length * 100) : 0) + '%';
   const b = activeBlank(L[i]);
   $('#gHint').disabled = $('#gSkip').disabled = !b;
   if (settings.mode === 'choice') {
-    if (b && !b.options) b.options = makeOptions(b);
+    if (b && !b.options) b.options = makeOptions(b, L[i]);
     $$('#pad .opt').forEach((btn, k) => {
       const o = b && b.options[k];
       const gone = o && b.removed.has(norm(o));
@@ -690,9 +746,10 @@ function seg(name, opts, value) {
 function sheetSettings() {
   const inSong = document.body.dataset.view === 'song' && S.entries.length;
   openSheet(`<h3>Configurações</h3>
+    <div class="field"><label>Ritmo</label>${seg('pace', [['flow', 'Fluxo · música não para'], ['pause', 'Pausa em cada frase']], settings.pace)}</div>
     <div class="field"><label>Dificuldade</label>${seg('difficulty', [['facil', 'Fácil'], ['medio', 'Médio'], ['dificil', 'Difícil']], settings.difficulty)}</div>
     <div class="field"><label>Responder</label>${seg('mode', [['choice', 'Múltipla escolha'], ['type', 'Digitando']], settings.mode)}</div>
-    <div class="field"><label>Se eu demorar, repetir o trecho</label>${seg('autoReplay', [[0, 'Nunca'], [5, '5s'], [8, '8s'], [12, '12s'], [20, '20s']], settings.autoReplay)}</div>
+    <div class="field"><label>Modo pausa: se eu demorar, repetir o trecho</label>${seg('autoReplay', [[0, 'Nunca'], [5, '5s'], [8, '8s'], [12, '12s'], [20, '20s']], settings.autoReplay)}</div>
     <div class="field"><label>Velocidade</label>${seg('speed', [[0.5, '0.5x'], [0.75, '0.75x'], [1, '1x']], settings.speed)}</div>
     <div class="field"><label>Idioma das músicas</label>${seg('lang', [['en', 'EN'], ['es', 'ES'], ['fr', 'FR'], ['it', 'IT'], ['de', 'DE'], ['pt', 'PT']], settings.lang)}</div>
     <div class="toggle">Tradução PT-BR após completar<button class="switch ${settings.translate ? 'on' : ''}" data-t="translate"></button></div>
@@ -723,6 +780,7 @@ function sheetSettings() {
     settings[k] = v; saveSettings();
     g.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
     if (k === 'mode' && S.phase === 'play') { applyMode(); renderGame(); }
+    if (k === 'pace' && S.phase === 'play') { S.waiting = false; setRing(0); player.playVideo(); renderGame(); }
     if (k === 'speed' && playerReady) { player.setPlaybackRate(v); $('#gSpeed').innerHTML = `<b>${v}x</b><span>Velocidade</span>`; }
     if (S.phase === 'ready') renderReady();
   }));
