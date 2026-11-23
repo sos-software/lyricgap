@@ -34,6 +34,7 @@ let lib = store.get('lg:lib', null) || (() => {
   for (const [id, s] of Object.entries(old)) videos[id] = { id, title: s.title || id, author: '', lrc: s.lrc || null, offset: s.offset || 0, best: s.best || 0, fav: false, updated: s.updated || 0 };
   return { videos, playlists: [], recent: Object.keys(videos) };
 })();
+lib.phrases = lib.phrases || [];
 const saveLib = () => store.set('lg:lib', lib);
 function vid(id, meta) {
   let v = lib.videos[id];
@@ -185,6 +186,16 @@ function renderHome() {
     const list = Object.values(lib.videos).filter(v => v.fav).sort((a, b) => b.updated - a.updated);
     if (!list.length) box.appendChild(emptyMsg('Nenhum favorito ainda.<br>Toque na ☆ de uma música para salvar aqui.'));
     list.forEach(v => box.appendChild(videoItem(v)));
+  } else if (H.tab === 'phrases') {
+    if (!lib.phrases.length) box.appendChild(emptyMsg('🔖<br>Nenhuma frase salva ainda.<br>Durante o jogo, toque no marcador ao lado da frase anterior para guardar a frase, a tradução e o trecho da música.'));
+    lib.phrases.forEach(p => {
+      const el = document.createElement('div'); el.className = 'item phrase';
+      el.innerHTML = `<img class="thumb" loading="lazy" src="${thumb(p.videoId)}" alt="" style="width:64px">
+        <div class="meta"><b>${esc(p.text)}</b>${p.tr ? `<div class="tr">${esc(p.tr)}</div>` : ''}<small>${esc(p.title || '')} · ${fmtDur(p.start) || '0:00'}</small></div>
+        <button class="icon sm" data-a="play">${icon('play')}</button>`;
+      el.onclick = () => sheetClip(p);
+      box.appendChild(el);
+    });
   } else if (H.plOpen) {
     const pl = lib.playlists.find(p => p.id === H.plOpen);
     if (!pl) { H.plOpen = null; return renderHome(); }
@@ -679,7 +690,7 @@ function renderGame() {
   if (S.phase !== 'play') return;
   const i = S.cur, L = S.lines;
   const prev = L[i - 1];
-  $('#lPrev').innerHTML = prev ? lineHTML(prev, false, true) : '';
+  $('#lPrev').innerHTML = prev ? lineHTML(prev, false, true) + bmBtn(!!findPhrase(S.videoId, prev.text), `data-bm="${i - 1}"`) : '';
   $('#lPrev').classList.toggle('empty', !prev);
   $('#lCur').innerHTML = i < 0 ? '<span class="muted">🎧 Prepare-se…</span>' : lineHTML(L[i], true, false);
   $('#gSkip').classList.toggle('hidden', settings.pace === 'flow');
@@ -698,16 +709,64 @@ function renderGame() {
     });
   }
 }
-async function translateLine(line) {
-  if (!settings.translate || settings.lang === 'pt' || line.tr) return;
-  const key = settings.lang + '|' + line.text;
-  if (trCache[key]) { line.tr = trCache[key]; renderGame(); return; }
+async function fetchTr(text) {
+  if (settings.lang === 'pt') return null;
+  const key = settings.lang + '|' + text;
+  if (trCache[key]) return trCache[key];
   try {
-    const r = await fetchT('https://api.mymemory.translated.net/get?' + new URLSearchParams({ q: line.text, langpair: settings.lang + '|pt-BR' }));
+    const r = await fetchT('https://api.mymemory.translated.net/get?' + new URLSearchParams({ q: text, langpair: settings.lang + '|pt-BR' }));
     const j = await r.json();
     const tx = j && j.responseData && j.responseData.translatedText;
-    if (tx && !/MYMEMORY WARNING|INVALID/i.test(tx)) { line.tr = decode(tx); trCache[key] = line.tr; store.set('lg:tr', trCache); renderGame(); }
+    if (tx && !/MYMEMORY WARNING|INVALID/i.test(tx)) { trCache[key] = decode(tx); store.set('lg:tr', trCache); return trCache[key]; }
   } catch { }
+  return null;
+}
+async function translateLine(line) {
+  if (!settings.translate || line.tr) return;
+  const tr = await fetchTr(line.text);
+  if (tr) { line.tr = tr; renderGame(); }
+}
+
+/* ================= saved phrases ================= */
+const findPhrase = (videoId, text) => lib.phrases.find(p => p.videoId === videoId && p.text === text);
+async function toggleSavePhrase(line) {
+  if (!line) return false;
+  const ex = findPhrase(S.videoId, line.text);
+  if (ex) { lib.phrases = lib.phrases.filter(p => p !== ex); saveLib(); toast('Frase removida'); renderGame(); return false; }
+  const p = {
+    id: uid(), videoId: S.videoId, title: S.v.title, author: S.v.author, text: line.text, tr: line.tr || null, lang: settings.lang,
+    start: Math.max(0, line.t - S.offset - 0.4), end: line.end - S.offset + 0.4, savedAt: Date.now()
+  };
+  lib.phrases.unshift(p); saveLib(); toast('🔖 Frase salva');
+  renderGame();
+  if (!p.tr) { const tr = await fetchTr(p.text); if (tr) { p.tr = tr; line.tr = line.tr || tr; saveLib(); } }
+  return true;
+}
+const bmBtn = (saved, attrs) => `<button class="icon sm bm ${saved ? 'on' : ''}" ${attrs} title="Salvar frase">${icon(saved ? 'bm-f' : 'bm')}</button>`;
+
+let clipPlayer = null;
+function sheetClip(p) {
+  if (playerReady) player.pauseVideo();
+  const link = `https://youtu.be/${p.videoId}?t=${Math.floor(p.start)}`;
+  openSheet(`<div class="cliptext">${esc(p.text)}</div>${p.tr ? `<div class="tr">${esc(p.tr)}</div>` : ''}
+    <div class="clipwrap"><div id="clipPlayer"></div></div>
+    <p class="muted" style="text-align:center;margin:0 0 6px">${esc(p.title || '')} · ${fmtDur(p.start) || '0:00'}</p>
+    <div class="actions" style="margin-top:6px">
+      <button class="round" data-a="again">${icon('replay')}<span>Ouvir de novo</span></button>
+      <button class="round" data-a="song">${icon('play')}<span>Jogar música</span></button>
+      <a class="round" href="${link}" target="_blank" rel="noopener" style="text-decoration:none">${icon('ext')}<span>YouTube</span></a>
+      <button class="round" data-a="del">${icon('trash')}<span>Remover</span></button>
+    </div>`, {
+    again: () => clipPlayer && clipPlayer.loadVideoById({ videoId: p.videoId, startSeconds: p.start, endSeconds: p.end }),
+    song: () => { closeSheet(); openSong(p.videoId, { title: p.title, author: p.author }); },
+    del: () => { lib.phrases = lib.phrases.filter(x => x !== p); saveLib(); closeSheet(); renderHome(); toast('Frase removida'); }
+  });
+  if (!apiReady) { toast('Player ainda carregando…'); return; }
+  clipPlayer = new YT.Player('clipPlayer', {
+    videoId: p.videoId,
+    playerVars: { start: Math.floor(p.start), end: Math.ceil(p.end), playsinline: 1, rel: 0, autoplay: 1, modestbranding: 1, origin: location.origin },
+    events: { onReady: e => e.target.playVideo() }
+  });
 }
 function finish() {
   S.finished = true;
@@ -719,7 +778,7 @@ function finish() {
   const hasNext = S.queue && S.queue.idx + 1 < S.queue.ids.length;
   openSheet(`<h3>🎉 Fim da música!</h3>
     <div class="stats"><div><b>${S.score}</b><span>pontos</span></div><div><b>${acc}%</b><span>acertos</span></div><div><b>${S.v.best}</b><span>recorde</span></div></div>
-    ${missed.length ? `<p class="muted">Palavras para revisar</p><ul class="missed">${missed.map(x => `<li><b>${esc(x.b.answer)}</b> — ${esc(x.l.text)}${x.l.tr ? `<div class="tr">${esc(x.l.tr)}</div>` : ''}</li>`).join('')}</ul>` : '<p class="muted" style="text-align:center">Perfeito, nenhum erro! 🏆</p>'}
+    ${missed.length ? `<p class="muted">Palavras para revisar · 🔖 salva a frase</p><ul class="missed">${missed.map(x => `<li><div><b>${esc(x.b.answer)}</b> — ${esc(x.l.text)}${x.l.tr ? `<div class="tr">${esc(x.l.tr)}</div>` : ''}</div>${bmBtn(!!findPhrase(S.videoId, x.l.text), `data-a="bm" data-i="${S.lines.indexOf(x.l)}" style="position:static;transform:none"`)}</li>`).join('')}</ul>` : '<p class="muted" style="text-align:center">Perfeito, nenhum erro! 🏆</p>'}
     <div class="chips center">
       ${hasNext ? '<button class="btn primary" data-a="next">Próxima música ▶</button>' : ''}
       <button class="btn ${hasNext ? '' : 'primary'}" data-a="again">Jogar de novo</button>
@@ -727,7 +786,8 @@ function finish() {
     </div>`, {
     next: () => { const q = { ...S.queue, idx: S.queue.idx + 1 }; closeSheet(); endPlay(); openSong(q.ids[q.idx], lib.videos[q.ids[q.idx]], q); },
     again: () => { closeSheet(); startGame(); },
-    close: () => { closeSheet(); quitGame(); }
+    close: () => { closeSheet(); quitGame(); },
+    bm: async (e, el) => { e.stopPropagation(); const on = await toggleSavePhrase(S.lines[+el.dataset.i]); el.classList.toggle('on', on); el.innerHTML = icon(on ? 'bm-f' : 'bm'); }
   });
 }
 
@@ -737,7 +797,10 @@ function openSheet(html, actions = {}) {
   $$('#sheetContent [data-a]').forEach(el => { const f = actions[el.dataset.a]; if (f) el.addEventListener('click', e => f(e, el)); });
   $('#sheet').classList.remove('hidden');
 }
-function closeSheet() { $('#sheet').classList.add('hidden'); }
+function closeSheet() {
+  $('#sheet').classList.add('hidden');
+  if (clipPlayer) { try { clipPlayer.destroy(); } catch { } clipPlayer = null; }
+}
 $('#sheetBg').onclick = closeSheet;
 
 function seg(name, opts, value) {
@@ -804,6 +867,7 @@ function importLib(data) {
     if (!cur) lib.playlists.push(p); else p.items.forEach(i => { if (!cur.items.includes(i)) cur.items.push(i); });
   });
   lib.recent = [...new Set([...lib.recent, ...(data.recent || [])])].slice(0, 50);
+  (data.phrases || []).forEach(p => { if (!lib.phrases.some(x => x.id === p.id || (x.videoId === p.videoId && x.text === p.text))) lib.phrases.push(p); });
   saveLib();
 }
 function sheetAddToPlaylist(v) {
@@ -874,6 +938,7 @@ $('#changeBtn').onclick = () => { S.phase = 'lyrics'; showPane('pLyrics'); prefi
 $('#lrcSave').onclick = () => { const e = parseLRC($('#lrcBox').value); if (!e) { toast('LRC inválido'); return; } S.entries = e; saveSong(); renderReady(); toast('Salvo ✓'); };
 $('#lrcCopy').onclick = async () => { try { await navigator.clipboard.writeText($('#lrcBox').value); toast('Copiado ✓'); } catch { } };
 
+$('#lPrev').addEventListener('click', e => { const b = e.target.closest('[data-bm]'); if (b) toggleSavePhrase(S.lines[+b.dataset.bm]); });
 $('#answerForm').onsubmit = e => { e.preventDefault(); submitAnswer($('#answer').value); };
 $$('#pad .opt').forEach(btn => btn.onclick = () => { if (btn.textContent) submitAnswer(btn.textContent); });
 $$('.replayBtn').forEach(b => b.onclick = () => { setStatus('🔁 Ouvindo de novo…', 'info'); replayLine(); });
