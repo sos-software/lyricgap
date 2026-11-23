@@ -16,12 +16,14 @@
 </head>
 <body data-view="home">
 
-<!-- icon sprite -->
-<svg width="0" height="0" style="position:absolute">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
-    <symbol id="i-gear" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-lib" viewBox="0 0 24 24"><path d="M5 4v16M10 4v16M15 4.5l4.5 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
     <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
     <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
     <symbol id="i-star-f" viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.8l-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z" fill="currentColor"/></symbol>
@@ -39,107 +41,131 @@
     <symbol id="i-bm" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
     <symbol id="i-bm-f" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z" fill="currentColor"/></symbol>
     <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-sync" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7.5" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M12 9v4l2.5 2M10 3h4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6h14M5 11h14M5 16h9" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="currentColor"/><circle cx="16.5" cy="16" r="2.5" fill="currentColor"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   </defs>
 </svg>
 
-<!-- ============ HOME ============ -->
+<div class="statusbar-bg"></div>
+
+<!-- ================= HOME (tabs) ================= -->
 <section id="home" class="view">
-  <div class="topbar">
-    <div class="brand">Lyric<span>Gap</span></div>
-    <button class="icon" id="btnFull" title="Tela cheia"><svg><use href="#i-expand"/></svg></button>
-    <button class="icon" id="btnSettings" title="Configurações"><svg><use href="#i-gear"/></svg></button>
+  <header class="apphead">
+    <div class="logo" id="homeLogo"><span class="mark">♪</span>Lyric<span class="grad">Gap</span></div>
+    <h1 id="headTitle" class="hidden"></h1>
+    <button class="iconbtn" id="btnSettings" aria-label="Configurações"><svg><use href="#i-gear"/></svg></button>
+  </header>
+
+  <div id="tab-home" class="tabpanel on"></div>
+
+  <div id="tab-search" class="tabpanel">
+    <form id="searchForm" class="searchbar" autocomplete="off">
+      <svg><use href="#i-search"/></svg>
+      <input id="q" type="search" placeholder="Música, artista ou link do YouTube" enterkeyhint="search" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </form>
+    <div id="searchList"></div>
   </div>
-  <form id="searchForm" class="search" autocomplete="off">
-    <svg><use href="#i-search"/></svg>
-    <input id="q" type="search" placeholder="Buscar música ou colar link do YouTube" enterkeyhint="search" autocapitalize="off" autocorrect="off" spellcheck="false">
-  </form>
-  <div id="installHint" class="hint hidden">
-    <span>Para jogar em <b>tela cheia</b>: toque em <b>Compartilhar</b> <span class="shareico">⬆</span> e depois <b>Adicionar à Tela de Início</b>.</span>
-    <button class="icon sm" id="installClose"><svg><use href="#i-close"/></svg></button>
+
+  <div id="tab-library" class="tabpanel">
+    <div class="seg" id="libSeg">
+      <button data-lib="fav" class="on">Favoritos</button>
+      <button data-lib="lists">Playlists</button>
+      <button data-lib="ready">Com letra</button>
+    </div>
+    <div id="libList" class="list"></div>
   </div>
-  <nav class="seg" id="homeTabs">
-    <button data-tab="recent" class="on">Recentes</button>
-    <button data-tab="fav">Favoritos</button>
-    <button data-tab="lists">Playlists</button>
-    <button data-tab="phrases">Frases</button>
-  </nav>
-  <div id="homeList" class="list"></div>
+
+  <div id="tab-phrases" class="tabpanel">
+    <div id="phraseList" class="list"></div>
+  </div>
 </section>
 
-<!-- ============ SONG ============ -->
+<nav id="tabbar" class="tabbar">
+  <button data-tab="home" class="on"><svg><use href="#i-home"/></svg><span>Início</span></button>
+  <button data-tab="search"><svg><use href="#i-search"/></svg><span>Buscar</span></button>
+  <button data-tab="library"><svg><use href="#i-lib"/></svg><span>Biblioteca</span></button>
+  <button data-tab="phrases"><svg><use href="#i-bm"/></svg><span>Frases</span></button>
+</nav>
+
+<!-- ================= SONG ================= -->
 <section id="song" class="view">
-  <div class="topbar" id="songBar">
-    <button class="icon" id="btnBack"><svg><use href="#i-back"/></svg></button>
+  <header class="songhead" id="songBar">
+    <button class="iconbtn" id="btnBack" aria-label="Voltar"><svg><use href="#i-back"/></svg></button>
     <div class="ttl"><b id="songTitle"></b><small id="songSub"></small></div>
-    <button class="icon" id="btnFav"><svg><use href="#i-star"/></svg></button>
-    <button class="icon" id="btnAddPl"><svg><use href="#i-addlist"/></svg></button>
-  </div>
+    <button class="iconbtn" id="btnFav" aria-label="Favoritar"><svg><use href="#i-star"/></svg></button>
+    <button class="iconbtn" id="btnMore" aria-label="Mais opções"><svg><use href="#i-more"/></svg></button>
+  </header>
 
   <div id="videoWrap"><div id="player"></div></div>
 
   <!-- lyrics source -->
   <div id="pLyrics" class="pane">
-    <h3>Letra da música</h3>
-    <nav class="seg small" id="lyrTabs"><button data-tab="search" class="on">Buscar</button><button data-tab="paste">Colar</button></nav>
-    <div id="lyrSearch">
-      <div class="row2"><input id="qTrack" placeholder="Música"><input id="qArtist" placeholder="Artista"></div>
-      <button id="lrcSearchBtn" class="btn wide">Buscar letra sincronizada</button>
-      <div id="lrcResults" class="list compact"></div>
-    </div>
-    <div id="lyrPaste" class="hidden">
-      <p class="muted">Cole a letra (uma frase por linha). Depois você marca o tempo de cada frase tocando um botão no ritmo da música — só uma vez. Também aceita formato LRC <code>[00:12.34]</code>.</p>
-      <textarea id="pasteBox" rows="8" placeholder="Cole a letra aqui…"></textarea>
-      <button id="pasteBtn" class="btn primary wide">Usar esta letra</button>
+    <div class="card">
+      <div class="cardhead"><span class="ico"><svg><use href="#i-text"/></svg></span><div><b>Letra da música</b><small>Precisamos da letra sincronizada para jogar</small></div></div>
+      <div class="seg small" id="lyrTabs"><button data-tab="search" class="on">Buscar</button><button data-tab="paste">Colar letra</button></div>
+      <div id="lyrSearch">
+        <div class="row2"><input id="qTrack" placeholder="Música"><input id="qArtist" placeholder="Artista"></div>
+        <button id="lrcSearchBtn" class="btn tonal wide">Buscar letra</button>
+        <div id="lrcResults" class="list"></div>
+      </div>
+      <div id="lyrPaste" class="hidden">
+        <p class="caption">Cole a letra com uma frase por linha. Em seguida você marca o tempo de cada frase no ritmo da música (só uma vez). Também aceita o formato LRC.</p>
+        <textarea id="pasteBox" rows="8" placeholder="Cole a letra aqui…"></textarea>
+        <button id="pasteBtn" class="btn primary wide">Continuar</button>
+      </div>
     </div>
   </div>
 
   <!-- sync -->
   <div id="pSync" class="pane">
-    <h3>Sincronizar letra</h3>
-    <p class="muted">Dê play e toque o botão no instante em que cada frase <b>começa</b>. No PC: espaço marca, Backspace desfaz.</p>
-    <div class="syncnum" id="syncProg"></div>
-    <div class="lyrics short">
-      <div class="line prev" id="sPrev"></div>
-      <div class="line cur" id="sCur"></div>
-      <div class="line next" id="sNext"></div>
-    </div>
-    <div class="synccontrols">
-      <button class="round" id="sUndo"><svg><use href="#i-replay"/></svg><span>Desfazer</span></button>
-      <button class="bigcircle" id="sMark"><span>MARCAR</span></button>
-      <button class="round" id="sPlay"><svg><use href="#i-play"/></svg><span>Play</span></button>
-    </div>
-    <div class="chips center">
-      <button class="chip" id="sGap">Fim de frase (solo)</button>
-      <button class="chip" id="sSpeed">1x</button>
-      <button class="chip" id="sCancel">Cancelar</button>
+    <div class="card">
+      <div class="cardhead"><span class="ico"><svg><use href="#i-sync"/></svg></span><div><b>Sincronizar letra</b><small>Toque MARCAR quando cada frase começar</small></div><span class="counter" id="syncProg"></span></div>
+      <div class="synclyrics">
+        <div class="line prev" id="sPrev"></div>
+        <div class="line cur" id="sCur"></div>
+        <div class="line next" id="sNext"></div>
+      </div>
+      <div class="synccontrols">
+        <button class="ctrl" id="sUndo"><svg><use href="#i-replay"/></svg><span>Desfazer</span></button>
+        <button class="markbtn" id="sMark"><span>MARCAR</span></button>
+        <button class="ctrl" id="sPlay"><svg><use href="#i-play"/></svg><span>Play</span></button>
+      </div>
+      <div class="chips center-row">
+        <button class="chip" id="sGap">Fim de frase (solo)</button>
+        <button class="chip" id="sSpeed">1x</button>
+        <button class="chip" id="sCancel">Cancelar</button>
+      </div>
+      <p class="caption center-text">No PC: espaço marca · Backspace desfaz</p>
     </div>
   </div>
 
   <!-- ready -->
-  <div id="pReady" class="pane center">
-    <button class="bigcircle play" id="playBtn"><svg><use href="#i-play"/></svg></button>
-    <p class="readyinfo" id="readyInfo"></p>
-    <div class="chips center" id="readyChips"></div>
-    <div class="chips center">
-      <button class="chip ghost" id="resyncBtn">Re-sincronizar</button>
-      <button class="chip ghost" id="editBtn">Editar LRC</button>
-      <button class="chip ghost" id="changeBtn">Trocar letra</button>
+  <div id="pReady" class="pane">
+    <div class="tiles">
+      <div class="tile"><b id="rLines">0</b><span>frases</span></div>
+      <div class="tile"><b id="rBest">—</b><span>recorde</span></div>
+      <div class="tile"><b id="rLevel">Médio</b><span>nível</span></div>
     </div>
-    <div id="editBox" class="hidden">
-      <textarea id="lrcBox" rows="9"></textarea>
-      <div class="chips center"><button class="chip" id="lrcSave">Salvar</button><button class="chip" id="lrcCopy">Copiar</button></div>
+    <div class="card">
+      <div class="optrow"><span>Ritmo</span><div class="seg small" id="rdPace"><button data-v="flow">Fluxo</button><button data-v="pause">Pausa</button></div></div>
+      <div class="optrow"><span>Responder</span><div class="seg small" id="rdMode"><button data-v="choice">Escolha</button><button data-v="type">Digitando</button></div></div>
+      <div class="optrow"><span>Nível</span><div class="seg small" id="rdDiff"><button data-v="facil">Fácil</button><button data-v="medio">Médio</button><button data-v="dificil">Difícil</button></div></div>
+      <p class="caption" id="readyInfo"></p>
     </div>
+    <button class="cta" id="playBtn"><svg><use href="#i-play"/></svg>Jogar</button>
   </div>
 
   <!-- game -->
   <div id="pGame" class="pane">
     <div class="hud">
-      <button class="icon sm" id="gQuit"><svg><use href="#i-close"/></svg></button>
+      <button class="iconbtn sm" id="gQuit" aria-label="Sair"><svg><use href="#i-close"/></svg></button>
       <div class="bar"><div id="progress"></div></div>
       <div class="pill"><b id="hudScore">0</b></div>
-      <div class="pill streak">🔥<b id="hudStreak">0</b></div>
-      <button class="icon sm" id="gSet"><svg><use href="#i-gear"/></svg></button>
+      <div class="pill">🔥<b id="hudStreak">0</b></div>
+      <button class="iconbtn sm" id="gSet" aria-label="Configurações"><svg><use href="#i-gear"/></svg></button>
     </div>
     <div class="lyrics game">
       <div id="lPrev" class="prevcard empty"></div>
@@ -150,7 +176,7 @@
     <div id="pad" class="pad">
       <button class="opt up" data-k="0"></button>
       <button class="opt left" data-k="1"></button>
-      <button class="center replayBtn" id="padCenter" title="Ouvir de novo">
+      <button class="padcenter replayBtn" id="padCenter" aria-label="Ouvir de novo">
         <svg class="ring" viewBox="0 0 80 80"><circle cx="40" cy="40" r="36"/></svg>
         <svg class="ic"><use href="#i-replay"/></svg>
       </button>
@@ -159,25 +185,24 @@
     </div>
 
     <form id="answerForm" class="typebar" autocomplete="off">
-      <button type="button" class="replayBtn mini" id="typeReplay" title="Ouvir de novo">
+      <button type="button" class="replayBtn mini" id="typeReplay" aria-label="Ouvir de novo">
         <svg class="ring" viewBox="0 0 80 80"><circle cx="40" cy="40" r="36"/></svg>
         <svg class="ic"><use href="#i-replay"/></svg>
       </button>
       <input id="answer" placeholder="palavra que falta" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send">
-      <button class="send" type="submit"><svg><use href="#i-send"/></svg></button>
+      <button class="send" type="submit" aria-label="Enviar"><svg><use href="#i-send"/></svg></button>
     </form>
 
     <div class="actions">
-      <button class="round" id="gBack" title="Voltar um verso (toque de novo para voltar mais)"><svg><use href="#i-prev"/></svg><span>Voltar</span></button>
-      <button class="round" id="gHint"><svg><use href="#i-bulb"/></svg><span>Dica</span></button>
-      <button class="round" id="gPause"><svg><use href="#i-pause"/></svg><span>Pausa</span></button>
-      <button class="round" id="gSkip"><svg><use href="#i-skip"/></svg><span>Pular</span></button>
-      <button class="round" id="gSpeed"><b>1x</b><span>Velocidade</span></button>
+      <button class="ctrl" id="gBack"><svg><use href="#i-prev"/></svg><span>Voltar</span></button>
+      <button class="ctrl" id="gHint"><svg><use href="#i-bulb"/></svg><span>Dica</span></button>
+      <button class="ctrl" id="gPause"><svg><use href="#i-pause"/></svg><span>Pausa</span></button>
+      <button class="ctrl" id="gSkip"><svg><use href="#i-skip"/></svg><span>Pular</span></button>
+      <button class="ctrl" id="gSpeed"><b>1x</b><span>Velocidade</span></button>
     </div>
   </div>
 </section>
 
-<!-- bottom sheet -->
 <div id="sheet" class="sheet hidden">
   <div class="sheet-bg" id="sheetBg"></div>
   <div class="sheet-body"><div class="grabber"></div><div id="sheetContent"></div></div>

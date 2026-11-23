@@ -57,7 +57,7 @@ const S = {
   score: 0, streak: 0, offset: 0,
   sync: { lines: [], idx: 0, entries: [] }
 };
-const H = { tab: 'recent', plOpen: null, results: null, query: '' };
+const H = { tab: 'home', libTab: 'fav', plOpen: null, results: null, query: '' };
 
 /* ================= text helpers ================= */
 function norm(s) {
@@ -133,100 +133,181 @@ const panes = ['pLyrics', 'pSync', 'pReady', 'pGame'];
 function showPane(id) { panes.forEach(p => $('#' + p).classList.toggle('on', p === id)); }
 window.addEventListener('popstate', () => { if (document.body.dataset.view === 'song') go('home'); });
 
-/* ================= home ================= */
+/* ================= home (tabs) ================= */
+const hq = id => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
+function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
+function songMeta(v) {
+  const lv = lib.videos[v.id] || {};
+  return `${lv.lrc ? '<span class="badge">LETRA OK</span>' : ''}${lv.best ? '★ ' + lv.best + ' · ' : ''}${esc(v.author || '')}${v.dur > 0 ? ' · ' + fmtDur(v.dur) : ''}`;
+}
 function videoItem(v, { onOpen, trailing } = {}) {
   const lv = lib.videos[v.id];
-  const el = document.createElement('div');
-  el.className = 'item';
-  el.innerHTML = `<img class="thumb" loading="lazy" src="${thumb(v.id)}" alt="">
-    <div class="meta"><b>${esc(v.title || 'Vídeo ' + v.id)}</b>
-    <small>${lv && lv.lrc ? '<span class="badge">LETRA OK</span>' : ''}${lv && lv.best ? '★' + lv.best + ' · ' : ''}${esc(v.author || '')}${v.dur > 0 ? ' · ' + fmtDur(v.dur) : ''}</small></div>`;
-  const fav = document.createElement('button');
-  fav.className = 'icon sm' + (lv && lv.fav ? ' on' : '');
-  fav.innerHTML = icon(lv && lv.fav ? 'star-f' : 'star');
+  const row = el('div', 'item', `<img class="thumb" loading="lazy" src="${thumb(v.id)}" alt="">
+    <div class="meta"><b>${esc(v.title || 'Vídeo ' + v.id)}</b><small>${songMeta(v)}</small></div>`);
+  const fav = el('button', 'iconbtn sm' + (lv && lv.fav ? ' on' : ''), icon(lv && lv.fav ? 'star-f' : 'star'));
+  fav.setAttribute('aria-label', 'Favoritar');
   fav.onclick = e => { e.stopPropagation(); toggleFav(v); renderHome(); };
-  el.appendChild(fav);
-  if (trailing) el.appendChild(trailing);
+  row.appendChild(fav);
+  if (trailing) row.appendChild(trailing);
   else {
-    const add = document.createElement('button');
-    add.className = 'icon sm'; add.innerHTML = icon('addlist');
+    const add = el('button', 'iconbtn sm', icon('addlist'));
+    add.setAttribute('aria-label', 'Adicionar à playlist');
     add.onclick = e => { e.stopPropagation(); sheetAddToPlaylist(v); };
-    el.appendChild(add);
+    row.appendChild(add);
   }
-  el.onclick = onOpen || (() => openSong(v.id, v));
-  return el;
+  row.onclick = onOpen || (() => openSong(v.id, v));
+  return row;
+}
+function ccard(v) {
+  const c = el('button', 'ccard', `<img loading="lazy" src="${thumb(v.id)}" alt=""><b>${esc(v.title || v.id)}</b><small>${v.best ? '★ ' + v.best + ' · ' : ''}${esc(v.author || '')}</small>`);
+  c.onclick = () => openSong(v.id, v);
+  return c;
+}
+function section(title, action, actionLabel = 'Ver tudo') {
+  const s = el('div', 'section');
+  const h = el('div', 'sectionhead', `<h2>${esc(title)}</h2>`);
+  if (action) { const b = el('button', '', actionLabel); b.onclick = action; h.appendChild(b); }
+  s.appendChild(h);
+  return s;
 }
 function toggleFav(v) {
   const x = vid(v.id, v); x.fav = !x.fav; x.updated = Date.now(); saveLib();
   toast(x.fav ? '★ Adicionada aos favoritos' : 'Removida dos favoritos');
   return x.fav;
 }
-function emptyMsg(html) { const d = document.createElement('div'); d.className = 'empty'; d.innerHTML = html; return d; }
+function emptyMsg(ic, title, text) { return el('div', 'empty', `<div class="big">${icon(ic)}</div><b>${title}</b>${text}`); }
+function setTab(t) { H.tab = t; window.scrollTo(0, 0); renderHome(); if (t === 'search' && !H.results) setTimeout(() => $('#q').focus(), 50); }
 
+const TITLES = { home: '', search: 'Buscar', library: 'Biblioteca', phrases: 'Frases' };
 function renderHome() {
-  const box = $('#homeList'); box.innerHTML = '';
-  $$('#homeTabs button').forEach(b => b.classList.toggle('on', !H.results && b.dataset.tab === H.tab));
-  if (H.results) {
-    const head = document.createElement('div'); head.className = 'listhead';
-    head.innerHTML = `<h3>${H.results === 'loading' ? 'Buscando…' : 'Resultados'}</h3>`;
-    const x = document.createElement('button'); x.className = 'icon sm'; x.innerHTML = icon('close');
-    x.onclick = () => { H.results = null; $('#q').value = ''; renderHome(); };
-    head.appendChild(x); box.appendChild(head);
-    if (H.results === 'loading') return;
-    if (H.results.error) { box.appendChild(emptyMsg(H.results.error)); return; }
-    if (!H.results.length) { box.appendChild(emptyMsg('Nada encontrado.')); return; }
-    H.results.forEach(v => box.appendChild(videoItem(v)));
+  $$('#tabbar button').forEach(b => b.classList.toggle('on', b.dataset.tab === H.tab));
+  $$('.tabpanel').forEach(p => p.classList.toggle('on', p.id === 'tab-' + H.tab));
+  $('#homeLogo').classList.toggle('hidden', H.tab !== 'home');
+  $('#headTitle').classList.toggle('hidden', H.tab === 'home');
+  $('#headTitle').textContent = TITLES[H.tab];
+  ({ home: renderHomeTab, search: renderSearchTab, library: renderLibraryTab, phrases: renderPhrasesTab })[H.tab]();
+}
+
+function renderHomeTab() {
+  const box = $('#tab-home'); box.innerHTML = '';
+  const recent = lib.recent.map(id => lib.videos[id]).filter(Boolean);
+  if (!recent.length) {
+    const hero = el('div', 'hero', `<h2>Aprenda idiomas cantando</h2>
+      <p>Escolha uma música, complete a letra enquanto ela toca e veja a tradução de cada verso.</p>`);
+    const go = el('button', 'cta', icon('search') + 'Buscar uma música'); go.style.marginTop = '0';
+    go.onclick = () => setTab('search');
+    hero.appendChild(go);
+    hero.appendChild(el('div', 'steps', `
+      <div class="step"><span class="n">1</span><div><b>Escolha a música</b><span>Busque pelo nome ou cole um link do YouTube.</span></div></div>
+      <div class="step"><span class="n">2</span><div><b>Complete as lacunas</b><span>Toque a palavra certa no ritmo da música.</span></div></div>
+      <div class="step"><span class="n">3</span><div><b>Entenda e revise</b><span>Veja a tradução e salve as frases que quiser estudar.</span></div></div>`));
+    box.appendChild(hero);
+  } else {
+    const v = recent[0];
+    const f = el('button', 'feature', `<div class="ov"><span class="eyebrow">Continuar</span><b>${esc(v.title || v.id)}</b>
+      <small>${esc(v.author || '')}${v.best ? ' · recorde ' + v.best : ''}${v.lrc ? '' : ' · precisa de letra'}</small></div>
+      <span class="fab">${icon('play')}</span>`);
+    f.style.backgroundImage = `url(${hq(v.id)})`;
+    f.onclick = () => openSong(v.id, v);
+    box.appendChild(f);
+
+    if (recent.length > 1) {
+      const s = section('Recentes'); const car = el('div', 'carousel');
+      recent.slice(1, 15).forEach(x => car.appendChild(ccard(x))); s.appendChild(car); box.appendChild(s);
+    }
+    const favs = Object.values(lib.videos).filter(x => x.fav).sort((a, b) => b.updated - a.updated);
+    if (favs.length) {
+      const s = section('Favoritos', () => { H.libTab = 'fav'; setTab('library'); }); const car = el('div', 'carousel');
+      favs.slice(0, 15).forEach(x => car.appendChild(ccard(x))); s.appendChild(car); box.appendChild(s);
+    }
+    if (lib.phrases.length) {
+      const s = section('Frases salvas', () => setTab('phrases'));
+      const list = el('div', 'card list'); list.style.padding = '4px 14px';
+      lib.phrases.slice(0, 3).forEach(p => list.appendChild(phraseRow(p)));
+      s.appendChild(list); box.appendChild(s);
+    }
+  }
+  if (isIOS && !isStandalone && !store.get('lg:hintClosed', false)) {
+    const c = el('div', 'installcard', `${icon('share')}<span>Para jogar em <b>tela cheia</b>, toque em Compartilhar e depois em <b>Adicionar à Tela de Início</b>.</span>`);
+    const x = el('button', 'iconbtn sm', icon('close')); x.onclick = () => { store.set('lg:hintClosed', true); renderHome(); };
+    c.appendChild(x); box.appendChild(c);
+  }
+}
+
+const SUGGEST = ['Músicas fáceis em inglês', 'Acoustic covers', 'Ed Sheeran', 'Adele', 'Coldplay', 'Bruno Mars', 'The Beatles', 'Taylor Swift', 'Shakira', 'Músicas em espanhol'];
+function renderSearchTab() {
+  const box = $('#searchList'); box.innerHTML = '';
+  if (!H.results) {
+    const s = el('div', ''); s.appendChild(el('div', 'sectionhead', '<h2 style="font-size:17px">Sugestões</h2>'));
+    const wrap = el('div', 'suggest');
+    SUGGEST.forEach(q => { const b = el('button', '', esc(q)); b.onclick = () => { $('#q').value = q; doSearch(q); }; wrap.appendChild(b); });
+    s.appendChild(wrap);
+    s.appendChild(el('p', 'caption', 'Dica: você também pode colar o link de um vídeo do YouTube na busca.'));
+    box.appendChild(s);
     return;
   }
-  if (H.tab === 'recent') {
-    const list = lib.recent.map(id => lib.videos[id]).filter(Boolean);
-    if (!list.length) box.appendChild(emptyMsg('🎵<br>Busque uma música acima para começar.<br>Você também pode colar um link do YouTube.'));
-    list.forEach(v => box.appendChild(videoItem(v)));
-  } else if (H.tab === 'fav') {
+  if (H.results === 'loading') { box.appendChild(el('div', 'empty', '<b>Buscando…</b>')); return; }
+  if (H.results.error) { box.appendChild(emptyMsg('search', 'Busca indisponível', H.results.error)); return; }
+  if (!H.results.length) { box.appendChild(emptyMsg('search', 'Nada encontrado', 'Tente outro nome ou cole o link do vídeo.')); return; }
+  const list = el('div', 'list');
+  H.results.forEach(v => list.appendChild(videoItem(v)));
+  box.appendChild(list);
+}
+
+function renderLibraryTab() {
+  $$('#libSeg button').forEach(b => b.classList.toggle('on', b.dataset.lib === H.libTab));
+  const box = $('#libList'); box.innerHTML = '';
+  if (H.libTab === 'fav') {
     const list = Object.values(lib.videos).filter(v => v.fav).sort((a, b) => b.updated - a.updated);
-    if (!list.length) box.appendChild(emptyMsg('Nenhum favorito ainda.<br>Toque na ☆ de uma música para salvar aqui.'));
+    if (!list.length) box.appendChild(emptyMsg('star', 'Nenhum favorito', 'Toque na estrela de uma música para guardá-la aqui.'));
     list.forEach(v => box.appendChild(videoItem(v)));
-  } else if (H.tab === 'phrases') {
-    if (!lib.phrases.length) box.appendChild(emptyMsg('🔖<br>Nenhuma frase salva ainda.<br>Durante o jogo, toque no marcador ao lado da frase anterior para guardar a frase, a tradução e o trecho da música.'));
-    lib.phrases.forEach(p => {
-      const el = document.createElement('div'); el.className = 'item phrase';
-      el.innerHTML = `<img class="thumb" loading="lazy" src="${thumb(p.videoId)}" alt="" style="width:64px">
-        <div class="meta"><b>${esc(p.text)}</b>${p.tr ? `<div class="tr">${esc(p.tr)}</div>` : ''}<small>${esc(p.title || '')} · ${fmtDur(p.start) || '0:00'}</small></div>
-        <button class="icon sm" data-a="play">${icon('play')}</button>`;
-      el.onclick = () => sheetClip(p);
-      box.appendChild(el);
-    });
+  } else if (H.libTab === 'ready') {
+    const list = Object.values(lib.videos).filter(v => v.lrc).sort((a, b) => b.updated - a.updated);
+    if (!list.length) box.appendChild(emptyMsg('note', 'Nenhuma música pronta', 'Músicas com letra sincronizada aparecem aqui, prontas para jogar.'));
+    list.forEach(v => box.appendChild(videoItem(v)));
   } else if (H.plOpen) {
     const pl = lib.playlists.find(p => p.id === H.plOpen);
-    if (!pl) { H.plOpen = null; return renderHome(); }
-    const head = document.createElement('div'); head.className = 'listhead';
-    head.innerHTML = `<button class="icon sm" data-a="back">${icon('back')}</button><h3>${esc(pl.name)}</h3>
-      <button class="icon sm" data-a="more">${icon('more')}</button>
-      <button class="btn primary" data-a="play" style="padding:8px 16px">${icon('play', 'inl')}</button>`;
-    head.querySelector('[data-a=back]').onclick = () => { H.plOpen = null; renderHome(); };
+    if (!pl) { H.plOpen = null; return renderLibraryTab(); }
+    const head = el('div', 'listhead', `<button class="iconbtn sm" data-a="back">${icon('back')}</button><h3>${esc(pl.name)}</h3>
+      <button class="iconbtn sm" data-a="more">${icon('more')}</button>`);
+    head.querySelector('[data-a=back]').onclick = () => { H.plOpen = null; renderLibraryTab(); };
     head.querySelector('[data-a=more]').onclick = () => sheetPlaylistMenu(pl);
-    head.querySelector('[data-a=play]').onclick = () => pl.items.length ? openSong(pl.items[0], lib.videos[pl.items[0]], { plId: pl.id, ids: pl.items.slice(), idx: 0, name: pl.name }) : toast('Playlist vazia');
     box.appendChild(head);
-    if (!pl.items.length) box.appendChild(emptyMsg('Playlist vazia.<br>Use o botão ＋ ao lado das músicas para adicionar.'));
+    if (pl.items.length) {
+      const play = el('button', 'cta', icon('play') + 'Tocar playlist'); play.style.margin = '4px 0 10px';
+      play.onclick = () => openSong(pl.items[0], lib.videos[pl.items[0]], { plId: pl.id, ids: pl.items.slice(), idx: 0, name: pl.name });
+      box.appendChild(play);
+    } else box.appendChild(emptyMsg('addlist', 'Playlist vazia', 'Use o botão ＋ ao lado das músicas para adicionar.'));
     pl.items.forEach((id, i) => {
       const v = lib.videos[id] || { id };
-      const rm = document.createElement('button'); rm.className = 'icon sm'; rm.innerHTML = icon('trash');
-      rm.onclick = e => { e.stopPropagation(); pl.items.splice(i, 1); saveLib(); renderHome(); };
+      const rm = el('button', 'iconbtn sm', icon('trash'));
+      rm.onclick = e => { e.stopPropagation(); pl.items.splice(i, 1); saveLib(); renderLibraryTab(); };
       box.appendChild(videoItem(v, { trailing: rm, onOpen: () => openSong(id, v, { plId: pl.id, ids: pl.items.slice(), idx: i, name: pl.name }) }));
     });
   } else {
-    const nw = document.createElement('div'); nw.className = 'item';
-    nw.innerHTML = `<div class="thumb sq">＋</div><div class="meta"><b>Nova playlist</b></div>`;
+    const nw = el('div', 'item', `<div class="thumb sq">＋</div><div class="meta"><b>Nova playlist</b><small>Agrupe músicas para jogar em sequência</small></div>`);
     nw.onclick = () => sheetNewPlaylist();
     box.appendChild(nw);
     lib.playlists.forEach(pl => {
-      const el = document.createElement('div'); el.className = 'item';
-      el.innerHTML = (pl.items[0] ? `<img class="thumb sq" style="object-fit:cover" src="${thumb(pl.items[0])}" alt="">` : `<div class="thumb sq">♪</div>`) +
-        `<div class="meta"><b>${esc(pl.name)}</b><small>${pl.items.length} música${pl.items.length === 1 ? '' : 's'}</small></div>`;
-      el.onclick = () => { H.plOpen = pl.id; renderHome(); };
-      box.appendChild(el);
+      const row = el('div', 'item', (pl.items[0] ? `<img class="thumb sq" src="${thumb(pl.items[0])}" alt="">` : `<div class="thumb sq">♪</div>`) +
+        `<div class="meta"><b>${esc(pl.name)}</b><small>${pl.items.length} música${pl.items.length === 1 ? '' : 's'}</small></div>${icon('chev')}`);
+      row.querySelector('svg:last-child').style.color = 'var(--muted)';
+      row.onclick = () => { H.plOpen = pl.id; renderLibraryTab(); };
+      box.appendChild(row);
     });
   }
+}
+
+function phraseRow(p) {
+  const row = el('div', 'item phrase', `<div class="meta"><b>${esc(p.text)}</b>${p.tr ? `<div class="tr">${esc(p.tr)}</div>` : ''}
+    <small>${esc(p.title || '')} · ${fmtDur(p.start) || '0:00'}</small></div><span class="iconbtn sm">${icon('play')}</span>`);
+  row.onclick = () => sheetClip(p);
+  return row;
+}
+function renderPhrasesTab() {
+  const box = $('#phraseList'); box.innerHTML = '';
+  if (!lib.phrases.length) { box.appendChild(emptyMsg('bm', 'Nenhuma frase salva', 'Durante o jogo, toque no marcador ao lado de uma frase para guardar o texto, a tradução e o trecho da música.')); return; }
+  lib.phrases.forEach(p => box.appendChild(phraseRow(p)));
 }
 
 /* ================= YouTube search ================= */
@@ -262,7 +343,7 @@ async function doSearch(q) {
   const id = parseVideoId(q);
   if (id) { $('#q').value = ''; $('#q').blur(); openSong(id, null); return; }
   $('#q').blur();
-  H.results = 'loading'; H.query = q; renderHome();
+  H.tab = 'search'; H.results = 'loading'; H.query = q; renderHome();
   try { H.results = await ytSearch(q); }
   catch (e) {
     H.results = { error: e.message === 'offline'
@@ -357,7 +438,8 @@ async function searchLyrics() {
     if (!res.length) res = await (await fetchT('https://lrclib.net/api/search?' + new URLSearchParams({ q: `${track} ${artist}`.trim() }), 10000)).json();
     res = res.filter(r => r.syncedLyrics || r.plainLyrics).sort((a, b) => (!!b.syncedLyrics) - (!!a.syncedLyrics)).slice(0, 8);
     if (!res.length) {
-      box.innerHTML = '<p class="muted">Não achei essa letra no banco de letras. 👉 Toque em <b>Colar</b>, cole a letra (de qualquer site de letras) e sincronize — leva o tempo de ouvir a música uma vez, e fica salvo.</p>';
+      box.innerHTML = '<div class="notfound"><b>Letra não encontrada</b><span>Essa música ainda não está no banco de letras. Cole a letra de qualquer site e sincronize uma vez. Fica salvo para sempre.</span><button class="btn primary wide" id="goPaste">Colar letra</button></div>';
+      $('#goPaste').onclick = () => $('#lyrTabs [data-tab=paste]').click();
       return;
     }
     const vd = playerReady ? player.getDuration() : 0;
@@ -385,16 +467,15 @@ function saveSong() {
 const DIFF_LABEL = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' };
 function renderReady() {
   const n = S.entries.filter(e => e.text).length;
-  const best = S.v && S.v.best;
-  $('#readyInfo').innerHTML = `${n} frases${best ? ' · recorde <b>' + best + '</b>' : ''}<br>` + (settings.pace === 'flow'
-    ? 'A música não para: responda enquanto o verso toca. Quanto mais rápido, mais pontos.'
-    : 'O vídeo pausa no fim de cada frase com lacuna.');
-  const chips = [settings.pace === 'flow' ? '🌊 Fluxo' : '⏸ Pausa', DIFF_LABEL[settings.difficulty], settings.mode === 'choice' ? 'Escolha' : 'Digitando', settings.speed + 'x'];
-  $('#readyChips').innerHTML = chips.map(c => `<button class="chip">${esc(c)}</button>`).join('');
-  $$('#readyChips .chip').forEach(c => c.onclick = sheetSettings);
-  $('#lrcBox').value = toLRC(S.entries);
+  $('#rLines').textContent = n;
+  $('#rBest').textContent = (S.v && S.v.best) || '—';
+  $('#rLevel').textContent = DIFF_LABEL[settings.difficulty];
+  const mark = (id, val) => $$(id + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === String(val)));
+  mark('#rdPace', settings.pace); mark('#rdMode', settings.mode); mark('#rdDiff', settings.difficulty);
+  $('#readyInfo').textContent = settings.pace === 'flow'
+    ? 'A música não para: responda enquanto o verso toca. Quanto mais rápido, mais pontos. Erros só aparecem no final.'
+    : 'O vídeo pausa no fim de cada frase. Acertou, continua. Errou, a frase toca de novo.';
 }
-
 /* ================= sync mode ================= */
 function startSync(lines) {
   if (!lines.length) { toast('Nenhuma linha de letra encontrada.'); return; }
@@ -762,7 +843,7 @@ async function toggleSavePhrase(line) {
   if (!p.tr) { const tr = await fetchTr(p.text); if (tr) { p.tr = tr; line.tr = line.tr || tr; saveLib(); } }
   return true;
 }
-const bmBtn = (saved, attrs) => `<button class="icon sm bm ${saved ? 'on' : ''}" ${attrs} title="Salvar frase">${icon(saved ? 'bm-f' : 'bm')}</button>`;
+const bmBtn = (saved, attrs) => `<button class="iconbtn sm bm ${saved ? 'on' : ''}" ${attrs} title="Salvar frase">${icon(saved ? 'bm-f' : 'bm')}</button>`;
 
 let clipPlayer = null;
 function sheetClip(p) {
@@ -772,10 +853,10 @@ function sheetClip(p) {
     <div class="clipwrap"><div id="clipPlayer"></div></div>
     <p class="muted" style="text-align:center;margin:0 0 6px">${esc(p.title || '')} · ${fmtDur(p.start) || '0:00'}</p>
     <div class="actions" style="margin-top:6px">
-      <button class="round" data-a="again">${icon('replay')}<span>Ouvir de novo</span></button>
-      <button class="round" data-a="song">${icon('play')}<span>Jogar música</span></button>
-      <a class="round" href="${link}" target="_blank" rel="noopener" style="text-decoration:none">${icon('ext')}<span>YouTube</span></a>
-      <button class="round" data-a="del">${icon('trash')}<span>Remover</span></button>
+      <button class="ctrl" data-a="again">${icon('replay')}<span>Ouvir de novo</span></button>
+      <button class="ctrl" data-a="song">${icon('play')}<span>Jogar música</span></button>
+      <a class="ctrl" href="${link}" target="_blank" rel="noopener" style="text-decoration:none">${icon('ext')}<span>YouTube</span></a>
+      <button class="ctrl" data-a="del">${icon('trash')}<span>Remover</span></button>
     </div>`, {
     again: () => clipPlayer && clipPlayer.loadVideoById({ videoId: p.videoId, startSeconds: p.start, endSeconds: p.end }),
     song: () => { closeSheet(); openSong(p.videoId, { title: p.title, author: p.author }); },
@@ -799,7 +880,7 @@ function finish() {
   openSheet(`<h3>🎉 Fim da música!</h3>
     <div class="stats"><div><b>${S.score}</b><span>pontos</span></div><div><b>${acc}%</b><span>acertos</span></div><div><b>${S.v.best}</b><span>recorde</span></div></div>
     ${missed.length ? `<p class="muted">Palavras para revisar · 🔖 salva a frase</p><ul class="missed">${missed.map(x => `<li><div><b>${esc(x.b.answer)}</b> — ${esc(x.l.text)}${x.l.tr ? `<div class="tr">${esc(x.l.tr)}</div>` : ''}</div>${bmBtn(!!findPhrase(S.videoId, x.l.text), `data-a="bm" data-i="${S.lines.indexOf(x.l)}" style="position:static;transform:none"`)}</li>`).join('')}</ul>` : '<p class="muted" style="text-align:center">Perfeito, nenhum erro! 🏆</p>'}
-    <div class="chips center">
+    <div class="sheetbtns" style="flex-direction:column">
       ${hasNext ? '<button class="btn primary" data-a="next">Próxima música ▶</button>' : ''}
       <button class="btn ${hasNext ? '' : 'primary'}" data-a="again">Jogar de novo</button>
       <button class="btn" data-a="close">Fechar</button>
@@ -826,26 +907,38 @@ $('#sheetBg').onclick = closeSheet;
 function seg(name, opts, value) {
   return `<div class="seg small" data-seg="${name}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(v) === String(value) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
 }
+const swRow = (label, key, sub = '') => `<div class="grow"><span>${label}${sub ? `<small>${sub}</small>` : ''}</span><button class="switch ${settings[key] ? 'on' : ''}" data-t="${key}" aria-label="${label}"></button></div>`;
 function sheetSettings() {
   const inSong = document.body.dataset.view === 'song' && S.entries.length;
   openSheet(`<h3>Configurações</h3>
-    <div class="field"><label>Ritmo</label>${seg('pace', [['flow', 'Fluxo · música não para'], ['pause', 'Pausa em cada frase']], settings.pace)}</div>
-    <div class="field"><label>Dificuldade</label>${seg('difficulty', [['facil', 'Fácil'], ['medio', 'Médio'], ['dificil', 'Difícil']], settings.difficulty)}</div>
+    <div class="grouplabel">Jogo</div>
+    <div class="field"><label>Ritmo</label>${seg('pace', [['flow', 'Fluxo'], ['pause', 'Pausa em cada frase']], settings.pace)}</div>
+    <div class="field"><label>Nível</label>${seg('difficulty', [['facil', 'Fácil'], ['medio', 'Médio'], ['dificil', 'Difícil']], settings.difficulty)}</div>
     <div class="field"><label>Responder</label>${seg('mode', [['choice', 'Múltipla escolha'], ['type', 'Digitando']], settings.mode)}</div>
-    <div class="field"><label>Modo pausa: se eu demorar, repetir o trecho</label>${seg('autoReplay', [[0, 'Nunca'], [5, '5s'], [8, '8s'], [12, '12s'], [20, '20s']], settings.autoReplay)}</div>
     <div class="field"><label>Velocidade</label>${seg('speed', [[0.5, '0.5x'], [0.75, '0.75x'], [1, '1x']], settings.speed)}</div>
+    <div class="field"><label>No modo Pausa, repetir o trecho se eu demorar</label>${seg('autoReplay', [[0, 'Nunca'], [5, '5s'], [8, '8s'], [12, '12s'], [20, '20s']], settings.autoReplay)}</div>
+    ${inSong ? `<div class="group"><div class="grow"><span>Sincronia desta música<small>Use − se a letra aparece antes da voz</small></span><div class="stepper"><button data-a="offm">−</button><span id="offVal">${(S.offset >= 0 ? '+' : '') + S.offset.toFixed(1)}s</span><button data-a="offp">+</button></div></div></div>` : ''}
+
+    <div class="grouplabel">Idioma</div>
     <div class="field"><label>Idioma das músicas</label>${seg('lang', [['en', 'EN'], ['es', 'ES'], ['fr', 'FR'], ['it', 'IT'], ['de', 'DE'], ['pt', 'PT']], settings.lang)}</div>
-    <div class="toggle">Tradução PT-BR após completar<button class="switch ${settings.translate ? 'on' : ''}" data-t="translate"></button></div>
-    <div class="toggle">Sons de acerto/erro<button class="switch ${settings.sounds ? 'on' : ''}" data-t="sounds"></button></div>
-    ${inSong ? `<div class="field"><label>Sincronia desta música</label><div class="toggle"><span class="muted">Use − se a letra aparece antes da voz</span><div class="stepper"><button data-a="offm">−</button><span id="offVal">${(S.offset >= 0 ? '+' : '') + S.offset.toFixed(1)}s</span><button data-a="offp">+</button></div></div></div>` : ''}
-    <div class="field"><label>Busca de vídeos</label>
-      <input id="ytKey" placeholder="Chave da API do YouTube (opcional)" value="${esc(settings.ytKey)}" autocapitalize="off" autocorrect="off" spellcheck="false">
-      <p class="muted" style="font-size:12px">Sem chave, a busca usa servidores gratuitos que às vezes ficam fora do ar. Com uma chave grátis (Google Cloud → YouTube Data API v3) a busca fica estável.</p></div>
-    <div class="field"><label>Biblioteca (favoritos, playlists, letras)</label>
-      <div class="chips"><button class="chip" data-a="export">Copiar backup</button><button class="chip" data-a="import">Restaurar backup</button></div>
-      <textarea id="ioBox" rows="4" class="hidden" placeholder="Cole aqui o backup e toque Restaurar"></textarea>
-      <p class="muted" style="font-size:12px">Use para levar suas músicas do PC para o iPhone (ou do Safari para o app da Tela de Início).</p></div>
-    <button class="btn primary wide" data-a="done">Pronto</button>`, {
+    <div class="group">
+      ${swRow('Tradução para português', 'translate', 'Mostrada no cartão da frase anterior')}
+      ${swRow('Sons de acerto', 'sounds')}
+    </div>
+
+    <div class="grouplabel">Busca de vídeos</div>
+    <input id="ytKey" placeholder="Chave da API do YouTube (opcional)" value="${esc(settings.ytKey)}" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <p class="caption" style="margin-top:6px">Sem chave, a busca usa servidores gratuitos que às vezes ficam fora do ar. Uma chave grátis (Google Cloud → YouTube Data API v3) deixa a busca estável.</p>
+
+    <div class="grouplabel">Biblioteca</div>
+    <div class="group">
+      <button class="grow" data-a="export">${icon('share')}<span>Copiar backup<small>Músicas, letras, playlists e frases</small></span></button>
+      <button class="grow" data-a="import">${icon('text')}<span>Restaurar backup<small>Mescla com o que já existe</small></span></button>
+    </div>
+    <textarea id="ioBox" rows="4" class="hidden" placeholder="Cole aqui o backup e toque em Restaurar backup"></textarea>
+
+    <button class="btn primary wide" data-a="done">Concluído</button>
+    <p class="caption center-text">LyricGap · letras de LRCLIB · tradução por MyMemory</p>`, {
     offm: () => nudge(-0.2), offp: () => nudge(0.2),
     export: async () => {
       const txt = JSON.stringify(lib); const box = $('#ioBox'); box.classList.remove('hidden'); box.value = txt; box.select();
@@ -853,22 +946,52 @@ function sheetSettings() {
     },
     import: () => {
       const box = $('#ioBox');
-      if (box.classList.contains('hidden') || !box.value.trim().startsWith('{')) { box.classList.remove('hidden'); box.value = ''; box.focus(); toast('Cole o backup e toque Restaurar de novo'); return; }
+      if (box.classList.contains('hidden') || !box.value.trim().startsWith('{')) { box.classList.remove('hidden'); box.value = ''; box.focus(); toast('Cole o backup e toque em Restaurar de novo'); return; }
       try { importLib(JSON.parse(box.value)); toast('Biblioteca restaurada ✓'); closeSheet(); renderHome(); } catch { toast('Backup inválido'); }
     },
     done: () => { settings.ytKey = ($('#ytKey').value || '').trim(); saveSettings(); closeSheet(); if (S.phase === 'ready') renderReady(); }
   });
-  $$('#sheetContent [data-seg]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => {
-    const k = g.dataset.seg; let v = b.dataset.v; if (['autoReplay', 'speed'].includes(k)) v = +v;
-    settings[k] = v; saveSettings();
-    g.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
-    if (k === 'mode' && S.phase === 'play') { applyMode(); renderGame(); }
-    if (k === 'pace' && S.phase === 'play') { S.waiting = false; setRing(0); player.playVideo(); renderGame(); }
-    if (k === 'speed' && playerReady) { player.setPlaybackRate(v); $('#gSpeed').innerHTML = `<b>${v}x</b><span>Velocidade</span>`; }
-    if (S.phase === 'ready') renderReady();
-  }));
-  $$('#sheetContent [data-t]').forEach(b => b.onclick = () => { const k = b.dataset.t; settings[k] = !settings[k]; saveSettings(); b.classList.toggle('on', settings[k]); });
+  $$('#sheetContent [data-seg]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => applySetting(g.dataset.seg, b.dataset.v, g)));
+  $$('#sheetContent [data-t]').forEach(b => b.onclick = () => { const k = b.dataset.t; settings[k] = !settings[k]; saveSettings(); b.classList.toggle('on', settings[k]); if (S.phase === 'play') renderGame(); });
   $('#ytKey').addEventListener('change', e => { settings.ytKey = e.target.value.trim(); saveSettings(); });
+}
+function applySetting(k, v, group) {
+  if (['autoReplay', 'speed'].includes(k)) v = +v;
+  settings[k] = v; saveSettings();
+  if (group) group.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.v === String(v)));
+  if (k === 'mode' && S.phase === 'play') { applyMode(); renderGame(); }
+  if (k === 'pace' && S.phase === 'play') { S.waiting = false; setRing(0); player.playVideo(); renderGame(); }
+  if (k === 'speed' && playerReady) { player.setPlaybackRate(v); $('#gSpeed').innerHTML = `<b>${v}x</b><span>Velocidade</span>`; }
+  if (S.phase === 'ready') renderReady();
+}
+function sheetSongMore() {
+  const v = S.v; if (!v) return;
+  const has = S.entries.length > 0;
+  openSheet(`<h3>${esc(v.title || 'Música')}</h3>
+    <div class="group">
+      <button class="grow" data-a="pl">${icon('addlist')}<span>Adicionar à playlist</span></button>
+      <button class="grow" data-a="yt">${icon('ext')}<span>Abrir no YouTube</span></button>
+    </div>
+    <div class="grouplabel">Letra</div>
+    <div class="group">
+      ${has ? `<button class="grow" data-a="resync">${icon('sync')}<span>Sincronizar de novo<small>Marcar o tempo de cada frase outra vez</small></span></button>
+      <button class="grow" data-a="edit">${icon('edit')}<span>Editar LRC<small>Corrigir texto ou tempos</small></span></button>` : ''}
+      <button class="grow" data-a="change">${icon('text')}<span>${has ? 'Trocar letra' : 'Buscar ou colar letra'}</span></button>
+    </div>`, {
+    pl: () => sheetAddToPlaylist(v),
+    yt: () => { closeSheet(); window.open('https://www.youtube.com/watch?v=' + v.id, '_blank', 'noopener'); },
+    resync: () => { closeSheet(); if (S.phase === 'play') quitGame(); startSync(S.entries.filter(e => e.text).map(e => e.text)); },
+    edit: () => sheetEditLRC(),
+    change: () => { closeSheet(); if (S.phase === 'play') quitGame(); S.phase = 'lyrics'; showPane('pLyrics'); prefillLyrics(); }
+  });
+}
+function sheetEditLRC() {
+  openSheet(`<h3>Editar LRC</h3><p class="caption" style="margin-top:0">Cada linha: <code>[mm:ss.cc]texto</code></p>
+    <textarea id="lrcBox" rows="12">${esc(toLRC(S.entries))}</textarea>
+    <div class="sheetbtns"><button class="btn" data-a="copy">Copiar</button><button class="btn primary" data-a="save">Salvar</button></div>`, {
+    copy: async () => { try { await navigator.clipboard.writeText($('#lrcBox').value); toast('Copiado ✓'); } catch { } },
+    save: () => { const e = parseLRC($('#lrcBox').value); if (!e) { toast('LRC inválido'); return; } S.entries = e; saveSong(); closeSheet(); if (S.phase === 'ready') renderReady(); toast('Salvo ✓'); }
+  });
 }
 function nudge(d) {
   S.offset = Math.round((S.offset + d) * 10) / 10;
@@ -921,20 +1044,13 @@ function sheetPlaylistMenu(pl) {
 /* ================= wiring ================= */
 $('#searchForm').onsubmit = e => { e.preventDefault(); doSearch($('#q').value); };
 $('#q').addEventListener('search', () => { if (!$('#q').value && H.results) { H.results = null; renderHome(); } });
-$$('#homeTabs button').forEach(b => b.onclick = () => { H.tab = b.dataset.tab; H.results = null; H.plOpen = null; renderHome(); });
+$$('#tabbar button').forEach(b => b.onclick = () => { if (H.tab === b.dataset.tab && b.dataset.tab === 'library') H.plOpen = null; setTab(b.dataset.tab); });
+$$('#libSeg button').forEach(b => b.onclick = () => { H.libTab = b.dataset.lib; H.plOpen = null; renderLibraryTab(); });
 $('#btnSettings').onclick = sheetSettings;
-$('#btnFull').onclick = () => {
-  const el = document.documentElement;
-  if (el.requestFullscreen && !isIOS) { document.fullscreenElement ? document.exitFullscreen() : el.requestFullscreen().catch(() => { }); }
-  else { $('#installHint').classList.remove('hidden'); toast('No iPhone: Compartilhar → Adicionar à Tela de Início'); }
-};
-if (isStandalone) $('#btnFull').classList.add('hidden');
-if (isIOS && !isStandalone && !store.get('lg:hintClosed', false)) $('#installHint').classList.remove('hidden');
-$('#installClose').onclick = () => { $('#installHint').classList.add('hidden'); store.set('lg:hintClosed', true); };
 
 $('#btnBack').onclick = () => { if (history.state && history.state.song) history.back(); else go('home'); };
 $('#btnFav').onclick = () => { toggleFav(S.v); updateSongBar(); };
-$('#btnAddPl').onclick = () => sheetAddToPlaylist(S.v);
+$('#btnMore').onclick = sheetSongMore;
 
 $$('#lyrTabs button').forEach(b => b.onclick = () => {
   $$('#lyrTabs button').forEach(x => x.classList.toggle('on', x === b));
@@ -952,11 +1068,8 @@ $('#sSpeed').onclick = e => { const r = { 1: 0.75, 0.75: 0.5, 0.5: 1 }[e.target.
 $('#sCancel').onclick = () => { if (playerReady) player.pauseVideo(); if (S.entries.length) { S.phase = 'ready'; showPane('pReady'); renderReady(); } else { S.phase = 'lyrics'; showPane('pLyrics'); } };
 
 $('#playBtn').onclick = startGame;
-$('#resyncBtn').onclick = () => startSync(S.entries.filter(e => e.text).map(e => e.text));
-$('#editBtn').onclick = () => $('#editBox').classList.toggle('hidden');
-$('#changeBtn').onclick = () => { S.phase = 'lyrics'; showPane('pLyrics'); prefillLyrics(); };
-$('#lrcSave').onclick = () => { const e = parseLRC($('#lrcBox').value); if (!e) { toast('LRC inválido'); return; } S.entries = e; saveSong(); renderReady(); toast('Salvo ✓'); };
-$('#lrcCopy').onclick = async () => { try { await navigator.clipboard.writeText($('#lrcBox').value); toast('Copiado ✓'); } catch { } };
+[['#rdPace', 'pace'], ['#rdMode', 'mode'], ['#rdDiff', 'difficulty']].forEach(([sel, key]) =>
+  $$(sel + ' button').forEach(b => b.onclick = () => applySetting(key, b.dataset.v)));
 
 ['#lPrev', '#lCur'].forEach(sel => $(sel).addEventListener('click', e => { const b = e.target.closest('[data-bm]'); if (b) toggleSavePhrase(S.lines[+b.dataset.bm]); }));
 $('#gBack').onclick = goBackVerse;
