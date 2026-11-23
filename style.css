@@ -297,3 +297,68 @@ body.playing #song{padding-top:var(--st)}
 .notfound b{display:block;font-size:15px;margin-bottom:4px}
 .notfound span{display:block;font-size:13.5px;line-height:1.5;color:var(--text2)}
 #lrcResults .item{padding:12px 0}
+
+/* ============ progress ============ */
+.progress{display:block;width:100%;text-align:left;margin-top:8px;padding:14px 14px 12px}
+.prog-top{display:flex;align-items:center;gap:14px}
+.prog-top > svg{color:var(--muted)}
+.ringwrap{position:relative;width:64px;height:64px;flex:none}
+.goalring{width:64px;height:64px;transform:rotate(-90deg)}
+.goalring circle{fill:none;stroke-width:6}
+.goalring .track{stroke:var(--s3)}
+.goalring .fill{stroke:var(--a1);stroke-linecap:round;transition:stroke-dashoffset .6s}
+.ringwrap span{position:absolute;inset:0;display:flex;align-items:baseline;justify-content:center;padding-top:20px}
+.ringwrap b{font-size:18px;font-weight:800;font-variant-numeric:tabular-nums}
+.ringwrap small{font-size:11px;color:var(--muted)}
+.prog-info{flex:1;min-width:0}
+.prog-info > b{display:block;font-size:16px;font-weight:700}
+.prog-info > small{display:block;font-size:13px;color:var(--muted);margin-top:2px}
+.prog-chips{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.pchip{font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--s2);color:var(--text2)}
+.pchip.lvl{background:rgba(139,92,246,.16);color:#c4b5fd}
+.prog-stats{display:grid;grid-template-columns:repeat(3,1fr);margin-top:14px;padding-top:12px;border-top:1px solid var(--line);text-align:center}
+.prog-stats div + div{border-left:1px solid var(--line)}
+.prog-stats b{display:block;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
+.prog-stats span{font-size:12px;color:var(--muted)}
+.lvlcard{display:flex;gap:14px;align-items:center;background:var(--s2);border-radius:16px;padding:14px}
+.lvlbadge{width:56px;height:56px;border-radius:18px;background:var(--grad);display:grid;place-items:center;font-size:24px;font-weight:800;color:#fff;flex:none}
+.lvlinfo{flex:1;min-width:0}
+.lvlinfo b{display:block;font-size:17px}
+.lvlinfo small{display:block;font-size:12.5px;color:var(--muted);margin:2px 0 8px}
+.chartcard{background:var(--s2);border-radius:16px;padding:12px 10px 4px}
+.weekchart{width:100%;height:auto;display:block}
+.weekchart .axis{stroke:var(--s3);stroke-width:1}
+.weekchart .goal{stroke:var(--muted);stroke-width:1;stroke-dasharray:3 4;opacity:.7}
+.weekchart .goaltxt{fill:var(--muted);font-size:10px;font-weight:600}
+.weekchart .b{fill:var(--a1);opacity:.45}
+.weekchart .b.today{opacity:1}
+.weekchart .col:hover .b{opacity:.8}
+.weekchart .val{fill:var(--text);font-size:11px;font-weight:700}
+.weekchart .lbl{fill:var(--muted);font-size:11px}
+.weekchart .lbl.on{fill:var(--text);font-weight:700}
+.statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.statgrid div{background:var(--s2);border-radius:14px;padding:12px 6px;text-align:center}
+.statgrid b{display:block;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.statgrid span{font-size:11.5px;color:var(--muted);line-height:1.25;display:block;margin-top:2px}
+.todayline{display:flex;justify-content:space-around;background:rgba(139,92,246,.1);border-radius:12px;padding:10px 8px;font-size:13px;color:var(--text2);margin-bottom:12px}
+.todayline b{color:var(--text)}
+
+/* heatmap — sequential violet ramp, dim → bright on the dark surface */
+.heatwrap{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.heatmap{width:100%;height:auto;display:block}
+.heatmap .hlbl{fill:var(--muted);font-size:9px}
+.h0{fill:#22222f;background:#22222f}
+.h1{fill:#3b2f6b;background:#3b2f6b}
+.h2{fill:#5b45b0;background:#5b45b0}
+.h3{fill:#8461f0;background:#8461f0}
+.h4{fill:#c2b0ff;background:#c2b0ff}
+.heatmap .htoday{stroke:var(--text);stroke-width:1.5}
+.heatmap .hsel{stroke:var(--a2);stroke-width:2}
+.heatlegend{display:flex;align-items:center;justify-content:flex-end;gap:3px;margin-top:8px;font-size:11px;color:var(--muted)}
+.heatlegend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.heatlegend span{margin:0 4px}
+.heatcard{padding:12px}
+.heatcard .heatmap rect{cursor:pointer}
+.heatfoot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px}
+.heatfoot .heatlegend{margin-top:0;flex:none}
+.heatcap{font-size:12px;color:var(--text2);min-width:0}

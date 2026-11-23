@@ -12,6 +12,7 @@ Jogo para aprender idiomas completando a letra de músicas do YouTube. A música
 - [Modos de jogo](#modos-de-jogo)
 - [Controles](#controles)
 - [Biblioteca: favoritos, playlists e frases salvas](#biblioteca-favoritos-playlists-e-frases-salvas)
+- [Progresso: contadores, meta diária e heatmap](#progresso-contadores-meta-diária-e-heatmap)
 - [De onde vêm a letra, a tradução e a busca](#de-onde-vêm-a-letra-a-tradução-e-a-busca)
 - [Usar no iPhone (tela cheia)](#usar-no-iphone-tela-cheia)
 - [Anúncios e YouTube Premium](#anúncios-e-youtube-premium)
@@ -83,6 +84,38 @@ As palavras escolhidas evitam artigos e palavras muito curtas. As opções errad
   Na aba **Frases**, tocar numa frase abre um player que **toca só aquele trecho**, com os botões *Ouvir de novo*, *Jogar música*, *YouTube* (abre o vídeo já no segundo certo, bom para compartilhar) e *Remover*.
 
 Tudo fica salvo **no próprio aparelho** (localStorage do navegador). Não existe servidor nem conta.
+
+## Progresso: contadores, meta diária e heatmap
+
+O card **Meta de hoje**, no topo da tela inicial, aparece depois do primeiro jogo e mostra:
+
+- **Anel da meta diária:** palavras certas hoje sobre a meta (padrão 20; dá para mudar para 10, 30, 50 ou 100).
+- **🔥 Dias seguidos:** dias consecutivos com atividade. Conta até ontem, então ainda dá tempo de manter a sequência hoje.
+- **Nível:** sobe com XP. Cada palavra certa vale 10, cada verso tocado vale 2 e cada música completa vale 50. A barra mostra quanto falta para o próximo nível.
+- **Contadores totais:** músicas ouvidas (completas), versos tocados e palavras certas.
+- **Heatmap das últimas 20 semanas:** um quadrado por dia, mais claro quanto mais palavras certas naquele dia (cheio = meta batida). O dia de hoje tem contorno.
+
+Tocar no card abre **Seu progresso**:
+
+- nível com barra de XP;
+- **heatmap de 6 meses**, em que tocar num dia mostra as palavras e os versos daquele dia;
+- **gráfico dos últimos 7 dias** (palavras certas por dia), com a linha da meta;
+- totais desde o começo: músicas ouvidas, músicas diferentes, versos tocados, palavras certas, precisão, tempo de jogo, dias seguidos, recorde de dias e frases salvas;
+- a escolha da meta diária.
+
+Avisos aparecem quando você **bate a meta do dia** 🎯 e quando **sobe de nível** ⬆️. A tela de fim de música mostra o resumo do dia (palavras/meta, dias seguidos, nível).
+
+**O que conta:**
+
+| Contador | Quando soma |
+|---|---|
+| Versos tocados | Cada verso novo alcançado durante o jogo (voltar e ouvir de novo não conta duas vezes) |
+| Palavras certas | Cada lacuna acertada |
+| Erros (para a precisão) | Lacuna errada, pulada ou que passou sem resposta |
+| Músicas ouvidas | Cada vez que você chega ao fim de uma música jogando |
+| Tempo de jogo | Tempo com a música tocando durante o jogo |
+
+Os números ficam no aparelho (junto com a biblioteca) e entram no backup.
 
 ## De onde vêm a letra, a tradução e a busca
 
@@ -179,7 +212,7 @@ node server.js
 
 **Dados no localStorage:**
 
-- `lg:lib`: músicas (letra LRC, sincronia, recorde, favorito), playlists, recentes e frases.
+- `lg:lib`: músicas (letra LRC, sincronia, recorde, favorito), playlists, recentes, frases e estatísticas de progresso (`stats`: totais e atividade por dia).
 - `lg:settings`: configurações.
 - `lg:tr`: cache de traduções.
 

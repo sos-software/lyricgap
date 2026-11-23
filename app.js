@@ -24,7 +24,7 @@ const icon = (name, cls = '') => `<svg class="${cls}"><use href="#i-${name}"/></
 
 /* ================= settings & library ================= */
 const settings = Object.assign(
-  { pace: 'flow', difficulty: 'medio', mode: isTouch ? 'choice' : 'type', speed: 1, translate: true, lang: 'en', autoReplay: 8, sounds: true, ytKey: '', pipedOk: '' },
+  { pace: 'flow', difficulty: 'medio', mode: isTouch ? 'choice' : 'type', speed: 1, translate: true, lang: 'en', autoReplay: 8, sounds: true, ytKey: '', pipedOk: '', goal: 20 },
   store.get('lg:settings', {})
 );
 const saveSettings = () => store.set('lg:settings', settings);
@@ -35,6 +35,45 @@ let lib = store.get('lg:lib', null) || (() => {
   return { videos, playlists: [], recent: Object.keys(videos) };
 })();
 lib.phrases = lib.phrases || [];
+lib.stats = Object.assign({ songs: 0, lines: 0, words: 0, misses: 0, ms: 0, days: {}, uniq: [] }, lib.stats || {});
+
+/* ================= progress stats ================= */
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+let statSaveT = null;
+function stat(k, n = 1) {
+  const st = lib.stats, before = levelOf(xpOf(st)).level, d = st.days[dayKey()] || (st.days[dayKey()] = { songs: 0, lines: 0, words: 0, misses: 0, ms: 0 });
+  const goalBefore = d.words >= settings.goal;
+  st[k] = (st[k] || 0) + n; d[k] = (d[k] || 0) + n;
+  clearTimeout(statSaveT); statSaveT = setTimeout(saveLib, 1500);
+  if (k === 'ms') return;
+  const after = levelOf(xpOf(st));
+  if (after.level > before) toast(`⬆️ Nível ${after.level} · ${after.name}!`);
+  else if (k === 'words' && !goalBefore && d.words >= settings.goal) toast('🎯 Meta do dia batida!');
+}
+const xpOf = st => st.words * 10 + st.lines * 2 + st.songs * 50;
+const LEVEL_NAMES = ['Iniciante', 'Ouvinte', 'Curioso', 'Cantor de chuveiro', 'Afinado', 'Dedicado', 'Fluente', 'Virtuoso', 'Mestre', 'Lenda'];
+function levelOf(xp) {
+  let level = 1; while (xp >= 50 * level * level) level++;       // thresholds: 50, 200, 450, 800…
+  const from = 50 * (level - 1) * (level - 1), to = 50 * level * level;
+  return { level, name: LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)], xp, from, to, frac: (xp - from) / (to - from) };
+}
+function dayStreak() {
+  const days = lib.stats.days, active = k => days[k] && (days[k].words > 0 || days[k].lines > 0);
+  const d = new Date(); if (!active(dayKey(d))) d.setDate(d.getDate() - 1);
+  let n = 0; while (active(dayKey(d))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+function bestStreak() {
+  const keys = Object.keys(lib.stats.days).filter(k => lib.stats.days[k].words > 0 || lib.stats.days[k].lines > 0).sort();
+  let best = 0, run = 0, prev = null;
+  keys.forEach(k => { const t = new Date(k + 'T12:00'); run = prev && (t - prev) / 864e5 < 1.5 ? run + 1 : 1; best = Math.max(best, run); prev = t; });
+  return best;
+}
+const fmtNum = n => n >= 10000 ? (n / 1000).toFixed(n >= 100000 ? 0 : 1).replace('.', ',') + ' mil' : n.toLocaleString('pt-BR');
+function fmtTime(ms) { const m = Math.round(ms / 60000); return m < 60 ? m + ' min' : Math.floor(m / 60) + 'h ' + String(m % 60).padStart(2, '0'); }
+const todayStats = () => lib.stats.days[dayKey()] || { songs: 0, lines: 0, words: 0, misses: 0, ms: 0 };
+const hasProgress = () => lib.stats.lines > 0 || lib.stats.words > 0;
+
 const saveLib = () => store.set('lg:lib', lib);
 function vid(id, meta) {
   let v = lib.videos[id];
@@ -203,6 +242,7 @@ function renderHomeTab() {
       <div class="step"><span class="n">3</span><div><b>Entenda e revise</b><span>Veja a tradução e salve as frases que quiser estudar.</span></div></div>`));
     box.appendChild(hero);
   } else {
+    if (hasProgress()) box.appendChild(progressCard());
     const v = recent[0];
     const f = el('button', 'feature', `<div class="ov"><span class="eyebrow">Continuar</span><b>${esc(v.title || v.id)}</b>
       <small>${esc(v.author || '')}${v.best ? ' · recorde ' + v.best : ''}${v.lrc ? '' : ' · precisa de letra'}</small></div>
@@ -296,6 +336,114 @@ function renderLibraryTab() {
       box.appendChild(row);
     });
   }
+}
+
+/* ================= progress UI ================= */
+/* activity heatmap: one square per day, sequential single hue (more correct words = brighter) */
+const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+function heatLevel(day) {
+  if (!day || (!day.words && !day.lines)) return 0;
+  const f = day.words / settings.goal;
+  return f >= 1 ? 4 : f >= 0.5 ? 3 : f >= 0.2 ? 2 : 1;   // listened but few words still counts as level 1
+}
+function heatmap(weeks) {
+  const cell = 13, gap = 3, step = cell + gap, left = 22, topPad = 14;
+  const today = new Date(); today.setHours(12, 0, 0, 0);
+  const start = new Date(today); start.setDate(start.getDate() - start.getDay() - (weeks - 1) * 7);
+  const W = left + weeks * step, H = topPad + 7 * step;
+  let g = '', lastMonth = -1;
+  ['', 'seg', '', 'qua', '', 'sex', ''].forEach((l, i) => { if (l) g += `<text x="0" y="${topPad + i * step + cell - 3}" class="hlbl">${l}</text>`; });
+  const d = new Date(start);
+  for (let w = 0; w < weeks; w++) {
+    if (d.getMonth() !== lastMonth && d.getDate() <= 7) { g += `<text x="${left + w * step}" y="10" class="hlbl">${MONTHS[d.getMonth()]}</text>`; lastMonth = d.getMonth(); }
+    for (let wd = 0; wd < 7; wd++) {
+      if (d <= today) {
+        const k = dayKey(d), day = lib.stats.days[k], lvl = heatLevel(day);
+        const tip = `${d.getDate()} ${MONTHS[d.getMonth()]}: ${day ? `${day.words || 0} palavra${day.words === 1 ? '' : 's'} certa${day.words === 1 ? '' : 's'}, ${day.lines || 0} versos` : 'sem atividade'}`;
+        g += `<rect x="${left + w * step}" y="${topPad + wd * step}" width="${cell}" height="${cell}" rx="3" class="h${lvl}${k === dayKey() ? ' htoday' : ''}" data-tip="${tip}"><title>${tip}</title></rect>`;
+      }
+      d.setDate(d.getDate() + 1);
+    }
+  }
+  return `<svg class="heatmap" viewBox="0 0 ${W} ${H}" role="img" aria-label="Atividade diária nas últimas ${weeks} semanas">${g}</svg>`;
+}
+const heatLegend = () => `<div class="heatlegend"><span>menos</span>${[0, 1, 2, 3, 4].map(i => `<i class="h${i}"></i>`).join('')}<span>mais</span></div>`;
+
+
+function ringSVG(frac) {
+  const r = 26, c = +(2 * Math.PI * r).toFixed(1);
+  return `<svg class="goalring" viewBox="0 0 64 64"><circle cx="32" cy="32" r="${r}" class="track"/><circle cx="32" cy="32" r="${r}" class="fill" stroke-dasharray="${c}" stroke-dashoffset="${(c * (1 - Math.min(1, frac))).toFixed(1)}"/></svg>`;
+}
+function progressCard() {
+  const st = lib.stats, t = todayStats(), lv = levelOf(xpOf(st)), streak = dayStreak(), done = t.words >= settings.goal;
+  const c = el('button', 'progress card', `
+    <div class="prog-top">
+      <div class="ringwrap">${ringSVG(t.words / settings.goal)}<span><b>${t.words}</b><small>/${settings.goal}</small></span></div>
+      <div class="prog-info">
+        <b>${done ? 'Meta de hoje batida 🎯' : 'Meta de hoje'}</b>
+        <small>${done ? `${t.words} palavras certas hoje` : `Faltam ${settings.goal - t.words} palavras certas`}</small>
+        <div class="prog-chips"><span class="pchip">🔥 ${streak} dia${streak === 1 ? '' : 's'}</span><span class="pchip lvl">Nível ${lv.level}</span></div>
+      </div>
+      ${icon('chev')}
+    </div>
+    <div class="prog-stats">
+      <div><b>${fmtNum(st.songs)}</b><span>músicas</span></div>
+      <div><b>${fmtNum(st.lines)}</b><span>versos</span></div>
+      <div><b>${fmtNum(st.words)}</b><span>palavras</span></div>
+    </div>
+    <div class="heatwrap">${heatmap(20)}${heatLegend()}</div>`);
+  c.onclick = sheetProgress;
+  return c;
+}
+/* last 7 days, correct words per day — single series: one hue, today emphasised, goal as a dashed reference line */
+function weekChart() {
+  const names = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'], days = [], d = new Date();
+  d.setDate(d.getDate() - 6);
+  for (let i = 0; i < 7; i++) { const k = dayKey(d); days.push({ label: names[d.getDay()], v: (lib.stats.days[k] || {}).words || 0, today: i === 6 }); d.setDate(d.getDate() + 1); }
+  const W = 320, H = 150, base = 124, top = 18, max = Math.max(settings.goal, ...days.map(x => x.v)), bw = 22, slot = W / 7;
+  const y = v => base - (v / max) * (base - top);
+  const gy = y(settings.goal).toFixed(1);
+  let g = `<line x1="0" x2="${W}" y1="${base}" y2="${base}" class="axis"/>
+    <line x1="0" x2="${W}" y1="${gy}" y2="${gy}" class="goal"/><text x="${W}" y="${gy - 4}" text-anchor="end" class="goaltxt">meta ${settings.goal}</text>`;
+  days.forEach((x, i) => {
+    const cx = slot * i + slot / 2, x0 = cx - bw / 2, h = base - y(x.v), r = Math.min(4, h);
+    const bar = h > 0 ? `<path class="b${x.today ? ' today' : ''}" d="M${x0},${base} V${base - h + r} Q${x0},${base - h} ${x0 + r},${base - h} H${x0 + bw - r} Q${x0 + bw},${base - h} ${x0 + bw},${base - h + r} V${base} Z"/>` : '';
+    g += `<g class="col"><title>${x.label}: ${x.v} palavra${x.v === 1 ? '' : 's'} certa${x.v === 1 ? '' : 's'}</title>
+      <rect x="${slot * i}" y="0" width="${slot}" height="${H}" fill="transparent"/>${bar}
+      ${x.today && x.v ? `<text x="${cx}" y="${base - h - 6}" text-anchor="middle" class="val">${x.v}</text>` : ''}
+      <text x="${cx}" y="${H - 6}" text-anchor="middle" class="lbl${x.today ? ' on' : ''}">${x.today ? 'hoje' : x.label}</text></g>`;
+  });
+  return `<svg class="weekchart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Palavras certas por dia nos últimos 7 dias">${g}</svg>`;
+}
+function sheetProgress() {
+  const st = lib.stats, lv = levelOf(xpOf(st)), acc = st.words + st.misses ? Math.round(st.words / (st.words + st.misses) * 100) + '%' : '—';
+  const tiles = [
+    [fmtNum(st.songs), 'músicas ouvidas'], [fmtNum(st.uniq.length), 'músicas diferentes'], [fmtNum(st.lines), 'versos tocados'],
+    [fmtNum(st.words), 'palavras certas'], [acc, 'precisão'], [fmtTime(st.ms), 'tempo de jogo'],
+    [dayStreak(), 'dias seguidos'], [bestStreak(), 'recorde de dias'], [lib.phrases.length, 'frases salvas']
+  ];
+  openSheet(`<h3>Seu progresso</h3>
+    <div class="lvlcard"><div class="lvlbadge">${lv.level}</div><div class="lvlinfo"><b>${lv.name}</b>
+      <small>${fmtNum(lv.xp)} XP · faltam ${fmtNum(lv.to - lv.xp)} para o nível ${lv.level + 1}</small>
+      <div class="bar"><div style="width:${Math.round(lv.frac * 100)}%"></div></div></div></div>
+    <div class="grouplabel">Atividade · últimos 6 meses</div>
+    <div class="chartcard heatcard">${heatmap(26)}<div class="heatfoot"><span class="heatcap" id="heatCap">Toque em um dia para ver os detalhes</span>${heatLegend()}</div></div>
+    <div class="grouplabel">Últimos 7 dias · palavras certas</div>
+    <div class="chartcard">${weekChart()}</div>
+    <div class="grouplabel">Desde o começo</div>
+    <div class="statgrid">${tiles.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>
+    <div class="grouplabel">Meta diária de palavras certas</div>
+    ${seg('goal', [[10, '10'], [20, '20'], [30, '30'], [50, '50'], [100, '100']], settings.goal)}
+    <p class="caption">XP: 10 por palavra certa, 2 por verso tocado e 50 por música completa. Jogue um pouco todo dia para manter a sequência 🔥.</p>
+    <button class="btn primary wide" data-a="ok">Fechar</button>`, { ok: closeSheet });
+  $('#sheetContent .heatcard').addEventListener('click', e => {
+    const r = e.target.closest('[data-tip]'); if (!r) return;
+    $('#heatCap').textContent = r.dataset.tip;
+    $$('#sheetContent .hsel').forEach(x => x.classList.remove('hsel')); r.classList.add('hsel');
+  });
+  $$('#sheetContent [data-seg=goal] button').forEach(b => b.onclick = () => {
+    settings.goal = +b.dataset.v; saveSettings(); sheetProgress(); if (document.body.dataset.view === 'home') renderHome();
+  });
 }
 
 function phraseRow(p) {
@@ -611,6 +759,7 @@ function currentIdx(L) {
 function enterLine(idx) {
   if (S.backTarget != null && idx >= S.maxCur && Date.now() - S.backAt > 300) { S.backTarget = null; setStatus('', ''); } // caught up again
   S.cur = idx;
+  if (idx > S.maxCur && idx >= 0) stat('lines');
   S.maxCur = Math.max(S.maxCur, idx);
   const line = S.lines[idx];
   if (line) translateLine(line);   // prefetch so it's ready when the line becomes "previous"
@@ -625,18 +774,21 @@ function tickFlow(L) {
   const idx = currentIdx(L);
   if (idx > S.cur) {
     for (let i = Math.max(0, S.cur); i < idx; i++) {
-      S.lines[i].blanks.forEach(b => { if (!b.solved) { b.solved = true; b.missed = true; b.soft = true; S.streak = 0; } });
+      S.lines[i].blanks.forEach(b => { if (!b.solved) { b.solved = true; b.missed = true; b.soft = true; S.streak = 0; stat('misses'); } });
     }
   }
   if (idx !== S.cur) enterLine(idx);
   const line = S.lines[S.cur];
   setRing(line && hasUnsolved(line) ? 1 - (L - line.t) / Math.max(0.5, line.end - line.t) : 0);
   const last = S.lines[S.lines.length - 1];
-  if (last && S.cur === S.lines.length - 1 && L > last.end) last.blanks.forEach(b => { if (!b.solved) { b.solved = b.missed = b.soft = true; renderGame(); } });
+  if (last && S.cur === S.lines.length - 1 && L > last.end) last.blanks.forEach(b => { if (!b.solved) { b.solved = b.missed = b.soft = true; stat('misses'); renderGame(); } });
   checkFinish(idx, L);
 }
+let lastTick = Date.now();
 function tick() {
+  const now = Date.now(), dt = now - lastTick; lastTick = now;
   if (S.phase !== 'play' || !playerReady) return;
+  if (dt < 1000 && player.getPlayerState() === YT.PlayerState.PLAYING) { S.msAcc = (S.msAcc || 0) + dt; if (S.msAcc > 10000) { stat('ms', S.msAcc); S.msAcc = 0; } }
   const st = player.getPlayerState();
   const L = lyricTime();
   if (settings.pace === 'flow') return tickFlow(L);
@@ -698,7 +850,7 @@ function submitAnswer(value) {
   if (v === 'exact' || v === 'close') {
     b.solved = true;
     const pts = Math.max(10, [100, 60, 30][Math.min(b.attempts, 2)] - b.hint * 25);
-    S.streak++; S.score += pts + Math.min(S.streak - 1, 10) * 10;
+    S.streak++; S.score += pts + Math.min(S.streak - 1, 10) * 10; stat('words');
     setStatus(v === 'close' ? `Quase! Era “${b.answer}” · +${pts}` : `Isso! +${pts}`, 'good');
     flash('flash-ok'); beep(true);
     $('#answer').value = '';
@@ -708,7 +860,7 @@ function submitAnswer(value) {
     flash('flash-bad'); beep(false);
     if (settings.mode === 'choice') b.removed.add(norm(value));
     if (b.attempts >= 3) {
-      b.solved = true; b.missed = true;
+      b.solved = true; b.missed = true; stat('misses');
       setStatus(`Era “${b.answer}” — ouça de novo`, 'bad');
       $('#answer').value = '';
       if (!hasUnsolved(line)) translateLine(line);
@@ -731,12 +883,12 @@ function submitFlow(line, b, v, value) {
     const L = lyricTime();
     const speed = Math.max(0, Math.min(1, 1 - (L - line.t) / Math.max(0.5, line.end - line.t)));
     const pts = Math.max(10, 50 + Math.round(speed * 50) - b.hint * 20 - b.attempts * 15);
-    S.streak++; S.score += pts + Math.min(S.streak - 1, 10) * 5;
+    S.streak++; S.score += pts + Math.min(S.streak - 1, 10) * 5; stat('words');
     setStatus(S.streak >= 3 ? `+${pts} · 🔥${S.streak}` : `+${pts}`, 'good');
     flash('flash-ok'); beep(true);
     $('#answer').value = '';
   } else if (settings.mode === 'choice') {
-    b.solved = true; b.missed = true; b.soft = true; S.streak = 0;
+    b.solved = true; b.missed = true; b.soft = true; S.streak = 0; stat('misses');
     setStatus('', '');
   } else {
     b.attempts++;            // typing: let the player try again until the line ends
@@ -754,7 +906,7 @@ function giveHint() {
 }
 function skipBlank() {
   const line = S.lines[S.cur]; if (!line) return;
-  line.blanks.forEach(b => { if (!b.solved) { b.solved = true; b.missed = true; } });
+  line.blanks.forEach(b => { if (!b.solved) { b.solved = true; b.missed = true; stat('misses'); } });
   S.streak = 0; setStatus('Pulado', '');
   translateLine(line); renderGame();
   if (S.waiting) resume();
@@ -871,6 +1023,8 @@ function sheetClip(p) {
 }
 function finish() {
   S.finished = true;
+  stat('songs');
+  if (!lib.stats.uniq.includes(S.videoId)) lib.stats.uniq.push(S.videoId);
   const all = S.lines.flatMap(l => l.blanks.map(b => ({ b, l })));
   const ok = all.filter(x => x.b.solved && !x.b.missed).length;
   const acc = all.length ? Math.round(ok / all.length * 100) : 0;
@@ -879,6 +1033,7 @@ function finish() {
   const hasNext = S.queue && S.queue.idx + 1 < S.queue.ids.length;
   openSheet(`<h3>🎉 Fim da música!</h3>
     <div class="stats"><div><b>${S.score}</b><span>pontos</span></div><div><b>${acc}%</b><span>acertos</span></div><div><b>${S.v.best}</b><span>recorde</span></div></div>
+    ${(() => { const t = todayStats(), lv = levelOf(xpOf(lib.stats)), sk = dayStreak(); return `<div class="todayline"><span>Hoje <b>${t.words}/${settings.goal}</b> palavras</span><span>🔥 <b>${sk}</b> dia${sk === 1 ? "" : "s"}</span><span>Nível <b>${lv.level}</b></span></div>`; })()}
     ${missed.length ? `<p class="muted">Palavras para revisar · 🔖 salva a frase</p><ul class="missed">${missed.map(x => `<li><div><b>${esc(x.b.answer)}</b> — ${esc(x.l.text)}${x.l.tr ? `<div class="tr">${esc(x.l.tr)}</div>` : ''}</div>${bmBtn(!!findPhrase(S.videoId, x.l.text), `data-a="bm" data-i="${S.lines.indexOf(x.l)}" style="position:static;transform:none"`)}</li>`).join('')}</ul>` : '<p class="muted" style="text-align:center">Perfeito, nenhum erro! 🏆</p>'}
     <div class="sheetbtns" style="flex-direction:column">
       ${hasNext ? '<button class="btn primary" data-a="next">Próxima música ▶</button>' : ''}
