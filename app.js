@@ -24,10 +24,12 @@ const icon = (name, cls = '') => `<svg class="${cls}"><use href="#i-${name}"/></
 
 /* ================= settings & library ================= */
 const settings = Object.assign(
-  { pace: 'flow', difficulty: 'medio', mode: isTouch ? 'choice' : 'type', speed: 1, translate: true, lang: 'en', autoReplay: 8, sounds: true, ytKey: '', pipedOk: '', goal: 20 },
+  { pace: 'pause', difficulty: 'medio', mode: 'choice', speed: 1, translate: true, lang: 'en', autoReplay: 8, sounds: true, ytKey: '', pipedOk: '', goal: 20, musicOnly: true, karTr: 'side' },
   store.get('lg:settings', {})
 );
 const saveSettings = () => store.set('lg:settings', settings);
+// defaults v2: "Pausa em cada frase" + "Múltipla escolha" — applied once to settings saved before the change
+if (settings.defaultsV !== 2) { settings.pace = 'pause'; settings.mode = 'choice'; settings.defaultsV = 2; saveSettings(); }
 
 let lib = store.get('lg:lib', null) || (() => {
   const old = store.get('lg:songs', {}), videos = {};
@@ -36,6 +38,28 @@ let lib = store.get('lg:lib', null) || (() => {
 })();
 lib.phrases = lib.phrases || [];
 lib.stats = Object.assign({ songs: 0, lines: 0, words: 0, misses: 0, ms: 0, days: {}, uniq: [] }, lib.stats || {});
+// scoring v2: 1 point per correct word, +10 for a completed song. Old records (100s of points) no longer compare.
+// example songs, so the app opens with something to play. Added once to "Recentes" (after the user's own songs).
+const SAMPLES = [
+  ['knU9gRUWCno', 'The Strokes - Someday', 'The Strokes'],
+  ['tMVgLulcGQA', 'Sia - House On Fire', 'Sia'],
+  ['Am8zzSK5ORw', 'Coldplay - Ink', 'Coldplay'],
+  ['Tm0m2S4e6FE', 'Ben E. King - Stand By Me', 'Ben E. King'],
+  ['tdVAqxNLXiw', 'Coldplay - Yellow', 'Coldplay'],
+  ['WpYeekQkAdc', 'The Black Eyed Peas - Where Is The Love?', 'The Black Eyed Peas'],
+  ['8tsUxsZ2IqU', 'Angels & Airwaves - Lifeline', 'Angels & Airwaves'],
+  ['VcjzHMhBtf0', "Journey - Don't Stop Believin'", 'Journey'],
+  ['HdiILZVAk5A', "Queen - Don't Stop Me Now", 'Queen'],
+  ['d_HlPboLRL8', 'AURORA - Runaway', 'AURORA'],
+  ['Zz-DJr1Qs54', 'The Cranberries - Ode To My Family', 'The Cranberries'],
+  ['v45F0YesdZM', 'Sixpence None The Richer - Kiss Me', 'Sixpence None The Richer']
+];
+if (!lib.samplesV) {
+  SAMPLES.forEach(([id, title, author]) => { if (!lib.videos[id]) lib.videos[id] = { id, title, author, lrc: null, offset: 0, best: 0, fav: false, updated: 0, sample: true }; });
+  lib.recent = [...lib.recent, ...SAMPLES.map(s => s[0]).filter(id => !lib.recent.includes(id))].slice(0, 50);
+  lib.samplesV = 1; store.set('lg:lib', lib);
+}
+if (lib.scoreV !== 2) { Object.values(lib.videos).forEach(v => { v.best = 0; }); lib.scoreV = 2; store.set('lg:lib', lib); }
 
 /* ================= progress stats ================= */
 const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -50,11 +74,12 @@ function stat(k, n = 1) {
   if (after.level > before) toast(`⬆️ Nível ${after.level} · ${after.name}!`);
   else if (k === 'words' && !goalBefore && d.words >= settings.goal) toast('🎯 Meta do dia batida!');
 }
-const xpOf = st => st.words * 10 + st.lines * 2 + st.songs * 50;
+const SONG_BONUS = 10;
+const xpOf = st => st.words + st.songs * SONG_BONUS;   // same rule as the in-game points: 1 per word, +10 per finished song
 const LEVEL_NAMES = ['Iniciante', 'Ouvinte', 'Curioso', 'Cantor de chuveiro', 'Afinado', 'Dedicado', 'Fluente', 'Virtuoso', 'Mestre', 'Lenda'];
 function levelOf(xp) {
-  let level = 1; while (xp >= 50 * level * level) level++;       // thresholds: 50, 200, 450, 800…
-  const from = 50 * (level - 1) * (level - 1), to = 50 * level * level;
+  let level = 1; while (xp >= 10 * level * level) level++;       // thresholds: 10, 40, 90, 160…
+  const from = 10 * (level - 1) * (level - 1), to = 10 * level * level;
   return { level, name: LEVEL_NAMES[Math.min(level - 1, LEVEL_NAMES.length - 1)], xp, from, to, frac: (xp - from) / (to - from) };
 }
 function dayStreak() {
@@ -91,9 +116,9 @@ let player = null, apiReady = false, playerReady = false, pendingId = null, wake
 const S = {
   videoId: null, v: null, autoSearched: false, queue: null,
   entries: [], lines: [], pool: [],
-  phase: 'idle',        // idle | lyrics | sync | ready | play
+  phase: 'idle',        // idle | lyrics | sync | ready | play | karaoke
   cur: -1, hold: null, waiting: false, finished: false, lastActivity: 0,
-  score: 0, streak: 0, offset: 0,
+  score: 0, ok: 0, miss: 0, streak: 0, bestStreak: 0, offset: 0,
   sync: { lines: [], idx: 0, entries: [] }
 };
 const H = { tab: 'home', libTab: 'fav', plOpen: null, results: null, query: '' };
@@ -162,13 +187,14 @@ function go(view) {
   document.body.dataset.view = view;
   if (view === 'home') {
     if (playerReady) player.pauseVideo();
-    if (S.phase === 'play') endPlay();
+    if (inSession()) endPlay();
     S.phase = 'idle';
     renderHome();
   }
   window.scrollTo(0, 0);
 }
-const panes = ['pLyrics', 'pSync', 'pReady', 'pGame'];
+const inSession = () => S.phase === 'play' || S.phase === 'karaoke';
+const panes = ['pLyrics', 'pSync', 'pReady', 'pGame', 'pKaraoke'];
 function showPane(id) { panes.forEach(p => $('#' + p).classList.toggle('on', p === id)); }
 window.addEventListener('popstate', () => { if (document.body.dataset.view === 'song') go('home'); });
 
@@ -244,15 +270,16 @@ function renderHomeTab() {
   } else {
     if (hasProgress()) box.appendChild(progressCard());
     const v = recent[0];
-    const f = el('button', 'feature', `<div class="ov"><span class="eyebrow">Continuar</span><b>${esc(v.title || v.id)}</b>
-      <small>${esc(v.author || '')}${v.best ? ' · recorde ' + v.best : ''}${v.lrc ? '' : ' · precisa de letra'}</small></div>
+    if (!hasProgress() && v.sample) box.appendChild(el('p', 'intro', '<b>Aprenda idiomas cantando.</b> Escolha uma música, complete a letra enquanto ela toca e veja a tradução de cada verso.'));
+    const f = el('button', 'feature', `<div class="ov"><span class="eyebrow">${v.sample ? 'Comece por aqui' : 'Continuar'}</span><b>${esc(v.title || v.id)}</b>
+      <small>${esc(v.author || '')}${v.best ? ' · recorde ' + v.best : ''}${v.lrc || v.sample ? '' : ' · precisa de letra'}</small></div>
       <span class="fab">${icon('play')}</span>`);
     f.style.backgroundImage = `url(${hq(v.id)})`;
     f.onclick = () => openSong(v.id, v);
     box.appendChild(f);
 
     if (recent.length > 1) {
-      const s = section('Recentes'); const car = el('div', 'carousel');
+      const s = section(recent.slice(1, 15).every(x => x.sample) ? 'Músicas de exemplo' : 'Recentes'); const car = el('div', 'carousel');
       recent.slice(1, 15).forEach(x => car.appendChild(ccard(x))); s.appendChild(car); box.appendChild(s);
     }
     const favs = Object.values(lib.videos).filter(x => x.fav).sort((a, b) => b.updated - a.updated);
@@ -277,6 +304,13 @@ function renderHomeTab() {
 const SUGGEST = ['Músicas fáceis em inglês', 'Acoustic covers', 'Ed Sheeran', 'Adele', 'Coldplay', 'Bruno Mars', 'The Beatles', 'Taylor Swift', 'Shakira', 'Músicas em espanhol'];
 function renderSearchTab() {
   const box = $('#searchList'); box.innerHTML = '';
+  const filt = el('div', 'seg small searchfilt', `<button data-v="1" class="${settings.musicOnly ? 'on' : ''}">${icon('note')}Músicas</button><button data-v="0" class="${settings.musicOnly ? '' : 'on'}">Todos os vídeos</button>`);
+  filt.querySelectorAll('button').forEach(b => b.onclick = () => {
+    const v = b.dataset.v === '1'; if (v === settings.musicOnly) return;
+    settings.musicOnly = v; saveSettings();
+    if (H.query && H.results) doSearch(H.query); else renderSearchTab();
+  });
+  box.appendChild(filt);
   if (!H.results) {
     const s = el('div', ''); s.appendChild(el('div', 'sectionhead', '<h2 style="font-size:17px">Sugestões</h2>'));
     const wrap = el('div', 'suggest');
@@ -288,10 +322,48 @@ function renderSearchTab() {
   }
   if (H.results === 'loading') { box.appendChild(el('div', 'empty', '<b>Buscando…</b>')); return; }
   if (H.results.error) { box.appendChild(emptyMsg('search', 'Busca indisponível', H.results.error)); return; }
-  if (!H.results.length) { box.appendChild(emptyMsg('search', 'Nada encontrado', 'Tente outro nome ou cole o link do vídeo.')); return; }
+  if (!H.results.length) { box.appendChild(emptyMsg('search', 'Nada encontrado', settings.musicOnly ? 'Nenhuma música com esse nome. Tente “Todos os vídeos” ou cole o link.' : 'Tente outro nome ou cole o link do vídeo.')); return; }
   const list = el('div', 'list');
-  H.results.forEach(v => list.appendChild(videoItem(v)));
+  H.results.forEach(v => {
+    const row = videoItem(v);
+    const lv = lib.videos[v.id];
+    if (!(lv && lv.lrc)) { const b = el('span', 'lb'); b.dataset.id = v.id; row.querySelector('small').prepend(b); paintLyricBadge(b, lyricCheck.get(v.id)); }
+    list.appendChild(row);
+  });
   box.appendChild(list);
+  checkLyricsFor(H.results.slice(0, 10));
+}
+
+/* Lyrics availability for search results: ask LRCLIB once per video so the user sees which ones are playable. */
+const lyricCheck = new Map();   // videoId -> 'synced' | 'plain' | 'none' | 'loading'
+function paintLyricBadge(b, st) {
+  b.className = 'lb';
+  b.innerHTML = st === 'synced' ? '<span class="badge">LETRA ✓</span>' : st === 'plain' ? '<span class="badge warn">SÓ TEXTO</span>'
+    : st === 'none' ? '<span class="badge muted">SEM LETRA</span>' : '';
+}
+let lyricCheckPausedUntil = 0;
+async function checkLyricsFor(items) {
+  // LRCLIB rate-limits bursts (HTTP 429): one request per result, two at a time, and back off on 429
+  // so the lyrics lookup that runs when a song is opened is never starved.
+  const todo = items.filter(v => !lyricCheck.has(v.id) && !(lib.videos[v.id] && lib.videos[v.id].lrc));
+  todo.forEach(v => lyricCheck.set(v.id, 'loading'));
+  const worker = async () => {
+    for (let v; (v = todo.shift());) {
+      if (Date.now() < lyricCheckPausedUntil || document.body.dataset.view !== 'home') { lyricCheck.delete(v.id); continue; }
+      let st;
+      try {
+        const { track, artist } = guessTrack(v.title, v.author);
+        const r = await fetchT('https://lrclib.net/api/search?' + new URLSearchParams({ q: `${track} ${artist}`.trim() }), 8000);
+        if (r.status === 429) { lyricCheckPausedUntil = Date.now() + 30000; lyricCheck.delete(v.id); continue; }
+        const res = await r.json();
+        st = res.some(x => x.syncedLyrics) ? 'synced' : res.some(x => x.plainLyrics) ? 'plain' : 'none';
+      } catch { lyricCheck.delete(v.id); continue; }
+      lyricCheck.set(v.id, st);
+      $$(`#searchList .lb[data-id="${v.id}"]`).forEach(b => paintLyricBadge(b, st));
+      await wait(150);
+    }
+  };
+  await Promise.all([worker(), worker()]);
 }
 
 function renderLibraryTab() {
@@ -434,7 +506,7 @@ function sheetProgress() {
     <div class="statgrid">${tiles.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>
     <div class="grouplabel">Meta diária de palavras certas</div>
     ${seg('goal', [[10, '10'], [20, '20'], [30, '30'], [50, '50'], [100, '100']], settings.goal)}
-    <p class="caption">XP: 10 por palavra certa, 2 por verso tocado e 50 por música completa. Jogue um pouco todo dia para manter a sequência 🔥.</p>
+    <p class="caption">XP: 1 por palavra certa e ${SONG_BONUS} por música completa (jogada até o fim). Jogue um pouco todo dia para manter a sequência 🔥.</p>
     <button class="btn primary wide" data-a="ok">Fechar</button>`, { ok: closeSheet });
   $('#sheetContent .heatcard').addEventListener('click', e => {
     const r = e.target.closest('[data-tip]'); if (!r) return;
@@ -466,22 +538,34 @@ async function fetchT(url, ms = 7000) {
   try { return await fetch(url, { signal: c.signal }); } finally { clearTimeout(t); }
 }
 async function ytSearch(q) {
+  const music = settings.musicOnly;
   if (settings.ytKey) {
-    const r = await fetchT('https://www.googleapis.com/youtube/v3/search?' + new URLSearchParams({ part: 'snippet', type: 'video', maxResults: '20', videoEmbeddable: 'true', q, key: settings.ytKey }));
+    const p = { part: 'snippet', type: 'video', maxResults: '20', videoEmbeddable: 'true', q, key: settings.ytKey };
+    if (music) p.videoCategoryId = '10';   // YouTube category "Music"
+    const r = await fetchT('https://www.googleapis.com/youtube/v3/search?' + new URLSearchParams(p));
     const j = await r.json();
     if (j.error) throw new Error('API do YouTube: ' + j.error.message);
     return j.items.map(it => ({ id: it.id.videoId, title: decode(it.snippet.title), author: decode(it.snippet.channelTitle) }));
   }
   const order = [settings.pipedOk, ...PIPED.filter(x => x !== settings.pipedOk)].filter(Boolean);
+  const pipedQuery = async (base, filter) => {
+    const r = await fetchT(`${base}/search?${new URLSearchParams({ q, filter })}`);
+    if (!r.ok) throw new Error('http ' + r.status);
+    const j = await r.json();
+    return (j.items || []).filter(x => x.type === 'stream' && x.url && !x.isShort)
+      .map(x => ({ id: (x.url.match(/v=([\w-]{11})/) || [])[1], title: x.title, author: x.uploaderName, dur: x.duration }))
+      .filter(x => x.id);
+  };
   for (const base of order) {
     try {
-      const r = await fetchT(`${base}/search?${new URLSearchParams({ q, filter: 'videos' })}`);
-      if (!r.ok) continue;
-      const j = await r.json();
-      const items = (j.items || []).filter(x => x.type === 'stream' && x.url)
-        .map(x => ({ id: (x.url.match(/v=([\w-]{11})/) || [])[1], title: x.title, author: x.uploaderName, dur: x.duration }))
-        .filter(x => x.id && !x.isShort);
-      if (items.length) { if (settings.pipedOk !== base) { settings.pipedOk = base; saveSettings(); } return items; }
+      let items;
+      if (music) {
+        // YouTube Music: "songs" are the album audio (no clip intro, same timing as the lyrics), then official music videos
+        const [songs, vids] = await Promise.all([pipedQuery(base, 'music_songs').catch(() => null), pipedQuery(base, 'music_videos').catch(() => null)]);
+        if (!songs && !vids) continue;   // instance down
+        const seen = new Set(); items = [...(songs || []), ...(vids || [])].filter(x => !seen.has(x.id) && seen.add(x.id));
+      } else items = await pipedQuery(base, 'videos');
+      if (items.length || music) { if (settings.pipedOk !== base) { settings.pipedOk = base; saveSettings(); } return items; }
     } catch { }
   }
   throw new Error('offline');
@@ -514,8 +598,10 @@ function createPlayer(id) {
       onStateChange: e => {
         updateMeta();
         if (e.data === YT.PlayerState.ENDED && S.phase === 'play' && !S.finished) finish();
+        if (e.data === YT.PlayerState.ENDED && S.phase === 'karaoke' && !S.finished) karaokeEnd();
         const playing = e.data === YT.PlayerState.PLAYING;
         $('#gPause').innerHTML = icon(playing ? 'pause' : 'play') + `<span>${playing ? 'Pausa' : 'Tocar'}</span>`;
+        $('#kPause').innerHTML = icon(playing ? 'pause' : 'play') + `<span>${playing ? 'Pausa' : 'Tocar'}</span>`;
         $('#sPlay').innerHTML = icon(playing ? 'pause' : 'play') + `<span>${playing ? 'Pausa' : 'Play'}</span>`;
       },
       onError: e => {
@@ -528,7 +614,8 @@ function createPlayer(id) {
 function openSong(id, meta, queue = null) {
   S.queue = queue;
   const v = vid(id, meta);
-  lib.recent = [id, ...lib.recent.filter(x => x !== id)].slice(0, 50);
+  delete v.sample;   // an example song becomes a regular recent once opened
+  lib.recent =[id, ...lib.recent.filter(x => x !== id)].slice(0, 50);
   saveLib();
   Object.assign(S, { videoId: id, v, offset: v.offset || 0, autoSearched: false, entries: [] });
   if (document.body.dataset.view !== 'song') history.pushState({ song: id }, '');
@@ -565,11 +652,15 @@ function updateMeta() {
   }
   if (S.phase === 'lyrics' && !S.autoSearched) { S.autoSearched = true; searchLyrics(); }
 }
-function prefillLyrics() {
-  const v = S.v; let track = v.title || '', artist = (v.author || '').replace(/\s*-\s*Topic$/i, '').replace(/VEVO$/i, '').trim();
+function guessTrack(title, author) {
+  let track = title || '', artist = (author || '').replace(/\s*-\s*Topic$/i, '').replace(/VEVO$/i, '').trim();
   const m = track.match(/^(.+?)\s+[-–]\s+(.+)$/);
   if (m) { artist = m[1]; track = m[2]; }
-  track = track.replace(/[([](official|lyric|audio|video|clipe|hd|4k|visualizer|live|letra|legendado|tradu)[^)\]]*[)\]]/gi, '').replace(/\s+/g, ' ').trim();
+  track = track.replace(/[([](official|lyric|audio|video|clipe|hd|4k|visualizer|live|letra|legendado|tradu|ft\.?|feat)[^)\]]*[)\]]/gi, '').replace(/\s+/g, ' ').trim();
+  return { track, artist };
+}
+function prefillLyrics() {
+  const { track, artist } = guessTrack(S.v.title, S.v.author);
   $('#qTrack').value = track; $('#qArtist').value = artist;
 }
 
@@ -620,9 +711,10 @@ function renderReady() {
   $('#rLevel').textContent = DIFF_LABEL[settings.difficulty];
   const mark = (id, val) => $$(id + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === String(val)));
   mark('#rdPace', settings.pace); mark('#rdMode', settings.mode); mark('#rdDiff', settings.difficulty);
-  $('#readyInfo').textContent = settings.pace === 'flow'
-    ? 'A música não para: responda enquanto o verso toca. Quanto mais rápido, mais pontos. Erros só aparecem no final.'
-    : 'O vídeo pausa no fim de cada frase. Acertou, continua. Errou, a frase toca de novo.';
+  $('#readyInfo').textContent = (settings.pace === 'flow'
+    ? 'A música não para: responda enquanto o verso toca. Erros só aparecem no final.'
+    : 'O vídeo pausa no fim de cada frase. Acertou, continua. Errou, a frase toca de novo.')
+    + ` Cada palavra certa vale 1 ponto e terminar a música vale +${SONG_BONUS}.`;
 }
 /* ================= sync mode ================= */
 function startSync(lines) {
@@ -681,7 +773,7 @@ function tokenize(text) {
     return { raw, pre: m[1], core: m[2], post: m[3], word: /\p{L}/u.test(m[2]) };
   });
 }
-function buildGame() {
+function buildLines() {
   const E = S.entries, lines = [], seen = new Map();
   const dur = playerReady ? player.getDuration() : 0;
   for (let i = 0; i < E.length; i++) {
@@ -691,8 +783,13 @@ function buildGame() {
     if (end - E[i].t < 0.6) end = E[i].t + 0.6;
     const tokens = tokenize(E[i].text);
     tokens.forEach(tk => { if (tk.word && tk.core.length >= 2) { const k = norm(tk.core); if (k && !seen.has(k)) seen.set(k, tk.core); } });
-    lines.push({ t: E[i].t, end, text: E[i].text, tokens, blanks: [], blankMap: {}, tr: null });
+    lines.push({ t: E[i].t, end, text: E[i].text, tokens, blanks: [], blankMap: {}, tr: trCache[settings.lang + '|' + E[i].text] || null });
   }
+  S.lines = lines; S.pool = [...seen.values()];
+  return lines;
+}
+function buildGame() {
+  const lines = buildLines();
   const diff = settings.difficulty;
   lines.forEach(line => {
     if (diff === 'facil' && Math.random() > 0.6) return;
@@ -709,7 +806,6 @@ function buildGame() {
       line.blanks.push(b); line.blankMap[p.i] = b;
     });
   });
-  S.lines = lines; S.pool = [...seen.values()];
 }
 const activeBlank = line => line && line.blanks.find(b => !b.solved);
 const hasUnsolved = line => !!activeBlank(line);
@@ -721,10 +817,11 @@ function applyMode() {
 async function startGame() {
   if (!playerReady) { toast('O vídeo ainda está carregando…'); return; }
   buildGame();
-  Object.assign(S, { phase: 'play', cur: -1, maxCur: -1, backAt: 0, backTarget: null, hold: null, waiting: false, finished: false, score: 0, streak: 0 });
+  Object.assign(S, { phase: 'play', cur: -1, maxCur: -1, backAt: 0, backTarget: null, hold: null, waiting: false, finished: false, score: 0, ok: 0, miss: 0, streak: 0, bestStreak: 0 });
   showPane('pGame'); document.body.classList.add('playing'); closeSheet();
   applyMode();
   $('#gSpeed').innerHTML = `<b>${settings.speed}x</b><span>Velocidade</span>`;
+  if (S.lines[0]) translateLine(S.lines[0]);
   setStatus('🎧 Ouça e complete!', 'info');
   player.seekTo(0, true); player.setPlaybackRate(settings.speed); player.playVideo();
   renderGame();
@@ -734,12 +831,51 @@ async function startGame() {
 }
 function endPlay() {
   document.body.classList.remove('playing');
+  $('#skipIntro').classList.add('hidden');
   try { wakeLock && wakeLock.release(); } catch { } wakeLock = null;
 }
 function quitGame() {
   if (playerReady) player.pauseVideo();
   endPlay();
   S.phase = 'ready'; showPane('pReady'); renderReady();
+}
+/* "Encerrar": pause, confirm, and show the partial result (no song bonus). */
+function confirmQuit() {
+  if (!inSession()) return;
+  const wasPlaying = playerReady && player.getPlayerState() === YT.PlayerState.PLAYING;
+  if (playerReady) player.pauseVideo();
+  const kar = S.phase === 'karaoke';
+  openSheet(`<h3>Encerrar ${kar ? 'o karaokê' : 'a música'}?</h3>
+    ${kar ? '' : `<p class="muted" style="text-align:center;margin:0 0 6px">Até agora: <b>${S.ok}</b> certa${S.ok === 1 ? '' : 's'} · <b>${S.miss}</b> erro${S.miss === 1 ? '' : 's'}.<br>As palavras certas já contam no seu progresso. O bônus de +${SONG_BONUS} é só para quem termina a música.</p>`}
+    <div class="sheetbtns" style="flex-direction:column">
+      <button class="btn primary" data-a="end">${kar ? 'Encerrar' : 'Encerrar e ver resultado'}</button>
+      <button class="btn" data-a="cont">Continuar ${kar ? 'cantando' : 'jogando'}</button>
+    </div>`, {
+    end: () => { closeSheet(); if (kar) quitGame(); else showResults(false); },
+    cont: () => { closeSheet(); resumeAfter(); }
+  }, () => resumeAfter());
+  function resumeAfter() { if (wasPlaying && !S.waiting) player.playVideo(); }
+}
+/* Skip the clip intro / long instrumental: jump to just before the next sung line. */
+function nextLineGap(L) {
+  const next = S.lines[S.cur + 1], cur = S.lines[S.cur];
+  if (!next || S.waiting || (cur && L < cur.end)) return null;   // never cut a verse that is still being sung
+  const gap = next.t - L;
+  return gap > 5 ? { next, gap } : null;
+}
+function updateSkipIntro(L) {
+  const g = nextLineGap(L), b = $('#skipIntro');
+  b.classList.toggle('hidden', !g);
+  if (g) {
+    const txt = `${S.cur < 0 ? 'Pular para a letra' : 'Pular instrumental'} · ${Math.ceil(g.gap)}s`;
+    if (b.dataset.txt !== txt) { b.dataset.txt = txt; b.innerHTML = icon('skip') + `<span>${txt}</span>`; }
+  }
+}
+function skipToLyrics() {
+  if (!playerReady || !inSession()) return;
+  const g = nextLineGap(lyricTime()); if (!g) return;
+  seekLyric(g.next.t - 1.5); player.playVideo();
+  $('#skipIntro').classList.add('hidden');
 }
 const lyricTime = () => player.getCurrentTime() + S.offset;
 const seekLyric = t => player.seekTo(Math.max(0, t - S.offset), true);
@@ -761,9 +897,19 @@ function enterLine(idx) {
   S.cur = idx;
   if (idx > S.maxCur && idx >= 0) stat('lines');
   S.maxCur = Math.max(S.maxCur, idx);
-  const line = S.lines[idx];
-  if (line) translateLine(line);   // prefetch so it's ready when the line becomes "previous"
+  // the translation is shown under the verse being sung, so fetch this one and prefetch the next
+  if (S.lines[idx]) translateLine(S.lines[idx]);
+  if (S.lines[idx + 1]) translateLine(S.lines[idx + 1]);
   renderGame();
+}
+/* individual counters: 1 point per correct word, nothing else */
+function hitBlank(b) {
+  b.solved = true; S.ok++; S.score++; S.streak++; S.bestStreak = Math.max(S.bestStreak, S.streak); stat('words');
+}
+function missBlank(b, soft = false) {
+  if (b.solved) return;
+  b.solved = b.missed = true; if (soft) b.soft = true;
+  S.miss++; S.streak = 0; stat('misses');
 }
 function checkFinish(idx, L) {
   const last = S.lines[S.lines.length - 1];
@@ -774,23 +920,25 @@ function tickFlow(L) {
   const idx = currentIdx(L);
   if (idx > S.cur) {
     for (let i = Math.max(0, S.cur); i < idx; i++) {
-      S.lines[i].blanks.forEach(b => { if (!b.solved) { b.solved = true; b.missed = true; b.soft = true; S.streak = 0; stat('misses'); } });
+      S.lines[i].blanks.forEach(b => missBlank(b, true));
     }
   }
   if (idx !== S.cur) enterLine(idx);
   const line = S.lines[S.cur];
   setRing(line && hasUnsolved(line) ? 1 - (L - line.t) / Math.max(0.5, line.end - line.t) : 0);
   const last = S.lines[S.lines.length - 1];
-  if (last && S.cur === S.lines.length - 1 && L > last.end) last.blanks.forEach(b => { if (!b.solved) { b.solved = b.missed = b.soft = true; stat('misses'); renderGame(); } });
+  if (last && S.cur === S.lines.length - 1 && L > last.end && hasUnsolved(last)) { last.blanks.forEach(b => missBlank(b, true)); renderGame(); }
   checkFinish(idx, L);
 }
 let lastTick = Date.now();
 function tick() {
   const now = Date.now(), dt = now - lastTick; lastTick = now;
-  if (S.phase !== 'play' || !playerReady) return;
+  if (!inSession() || !playerReady) return;
   if (dt < 1000 && player.getPlayerState() === YT.PlayerState.PLAYING) { S.msAcc = (S.msAcc || 0) + dt; if (S.msAcc > 10000) { stat('ms', S.msAcc); S.msAcc = 0; } }
   const st = player.getPlayerState();
   const L = lyricTime();
+  updateSkipIntro(L);
+  if (S.phase === 'karaoke') return tickKaraoke(L);
   if (settings.pace === 'flow') return tickFlow(L);
   const cur = S.lines[S.cur];
   if (cur && hasUnsolved(cur) && st === YT.PlayerState.PLAYING && L >= cur.end - 0.15 && L < cur.end + 1.5) { pauseForAnswer(); return; }
@@ -841,6 +989,28 @@ function goBackVerse() {
 }
 function resume() { S.waiting = false; setRing(0); player.playVideo(); }
 
+/* Answer feedback: the tapped option turns green or shakes red (and the right one lights up when revealed),
+   the verse shakes, the typing box shakes, the phone vibrates. The pad is held still for a moment so the
+   player can see it before the next options appear. */
+let padFreezeUntil = 0, padFreezeT = null;
+function answerFeedback(value, ok, reveal = null) {
+  if (ok) { flash('flash-ok'); beep(true); }
+  else {
+    flash('flash-bad'); beep(false);
+    try { navigator.vibrate && navigator.vibrate(70); } catch { }
+    const a = $('#answer'); a.classList.remove('shake'); void a.offsetWidth; a.classList.add('shake');
+  }
+  if (settings.mode !== 'choice') return;
+  const ms = ok ? 450 : 950;
+  padFreezeUntil = Date.now() + ms;
+  $$('#pad .opt').forEach(btn => {
+    btn.classList.remove('pick-ok', 'pick-bad', 'pick-right'); void btn.offsetWidth;
+    const t = norm(btn.textContent);
+    if (t === norm(value)) btn.classList.add(ok ? 'pick-ok' : 'pick-bad');
+    else if (reveal && t === norm(reveal)) btn.classList.add('pick-right');
+  });
+  clearTimeout(padFreezeT); padFreezeT = setTimeout(renderGame, ms + 20);
+}
 function submitAnswer(value) {
   const line = S.lines[S.cur]; const b = activeBlank(line);
   if (!b) return;
@@ -848,19 +1018,17 @@ function submitAnswer(value) {
   if (v === 'empty') return;
   if (settings.pace === 'flow') return submitFlow(line, b, v, value);
   if (v === 'exact' || v === 'close') {
-    b.solved = true;
-    const pts = Math.max(10, [100, 60, 30][Math.min(b.attempts, 2)] - b.hint * 25);
-    S.streak++; S.score += pts + Math.min(S.streak - 1, 10) * 10; stat('words');
-    setStatus(v === 'close' ? `Quase! Era “${b.answer}” · +${pts}` : `Isso! +${pts}`, 'good');
-    flash('flash-ok'); beep(true);
+    hitBlank(b);
+    setStatus(v === 'close' ? `Quase! Era “${b.answer}” · +1` : `Isso! +1`, 'good');
+    answerFeedback(value, true);
     $('#answer').value = '';
     if (!hasUnsolved(line)) { translateLine(line); if (S.waiting) resume(); }
   } else {
     b.attempts++; S.streak = 0;
-    flash('flash-bad'); beep(false);
+    answerFeedback(value, false, b.attempts >= 3 ? b.answer : null);
     if (settings.mode === 'choice') b.removed.add(norm(value));
     if (b.attempts >= 3) {
-      b.solved = true; b.missed = true; stat('misses');
+      missBlank(b);
       setStatus(`Era “${b.answer}” — ouça de novo`, 'bad');
       $('#answer').value = '';
       if (!hasUnsolved(line)) translateLine(line);
@@ -876,22 +1044,21 @@ function submitAnswer(value) {
   }
   renderGame();
 }
-/* Flow: no rewinds, no red, no buzzer. Right = points (faster = more). Wrong = quietly revealed. */
+/* Flow: no rewinds. Right = +1. Wrong = a quick red shake, then the word is revealed and the music goes on. */
 function submitFlow(line, b, v, value) {
   if (v === 'exact' || v === 'close') {
-    b.solved = true;
-    const L = lyricTime();
-    const speed = Math.max(0, Math.min(1, 1 - (L - line.t) / Math.max(0.5, line.end - line.t)));
-    const pts = Math.max(10, 50 + Math.round(speed * 50) - b.hint * 20 - b.attempts * 15);
-    S.streak++; S.score += pts + Math.min(S.streak - 1, 10) * 5; stat('words');
-    setStatus(S.streak >= 3 ? `+${pts} · 🔥${S.streak}` : `+${pts}`, 'good');
-    flash('flash-ok'); beep(true);
+    hitBlank(b);
+    setStatus(S.streak >= 3 ? `+1 · 🔥${S.streak} seguidas` : '+1', 'good');
+    answerFeedback(value, true);
     $('#answer').value = '';
   } else if (settings.mode === 'choice') {
-    b.solved = true; b.missed = true; b.soft = true; S.streak = 0; stat('misses');
-    setStatus('', '');
+    missBlank(b, true);
+    setStatus(`✗ Era “${b.answer}”`, 'bad');
+    answerFeedback(value, false, b.answer);
   } else {
     b.attempts++;            // typing: let the player try again until the line ends
+    setStatus(`✗ Não é “${value}”`, 'bad');
+    answerFeedback(value, false);
     $('#answer').value = '';
   }
   renderGame();
@@ -906,8 +1073,8 @@ function giveHint() {
 }
 function skipBlank() {
   const line = S.lines[S.cur]; if (!line) return;
-  line.blanks.forEach(b => { if (!b.solved) { b.solved = true; b.missed = true; stat('misses'); } });
-  S.streak = 0; setStatus('Pulado', '');
+  line.blanks.forEach(b => missBlank(b));
+  setStatus('Pulado', '');
   translateLine(line); renderGame();
   if (S.waiting) resume();
 }
@@ -931,7 +1098,7 @@ function lineHTML(line, isCur, withTr) {
     else { const shown = b.answer.slice(0, b.hint); inner = `<span class="gap${b === act ? ' active' : ''}">${esc(shown)}${'_'.repeat(b.answer.length - shown.length)}</span>`; }
     return esc(tk.pre) + inner + esc(tk.post);
   }).join('');
-  if (withTr && line.tr && settings.translate) h += `<div class="tr">${esc(line.tr)}</div>`;
+  if (withTr && settings.translate && settings.lang !== 'pt') h += `<div class="tr${isCur ? ' trcur' : ''}">${line.tr ? esc(line.tr) : isCur && !line.trFail ? '<span class="trwait">traduzindo…</span>' : ''}</div>`;
   return h;
 }
 const DIRS = ['up', 'left', 'right', 'down'];
@@ -944,14 +1111,14 @@ function renderGame() {
   // a verse revisited with the back button shows its answers + translation (nothing left to answer)
   const revisit = i >= 0 && i < S.maxCur && !hasUnsolved(L[i]);
   $('#lCur').innerHTML = i < 0 ? '<span class="muted">🎧 Prepare-se…</span>'
-    : lineHTML(L[i], true, revisit) + (revisit ? ' ' + bmBtn(!!findPhrase(S.videoId, L[i].text), `data-bm="${i}" style="position:static;transform:none;display:inline-grid;vertical-align:middle"`) : '');
+    : lineHTML(L[i], true, true) + (revisit ? ' ' + bmBtn(!!findPhrase(S.videoId, L[i].text), `data-bm="${i}" style="position:static;transform:none;display:inline-grid;vertical-align:middle"`) : '');
   $('#gBack').disabled = S.cur <= 0 && S.backTarget == null;
   $('#gSkip').classList.toggle('hidden', settings.pace === 'flow');
-  $('#hudScore').textContent = S.score; $('#hudStreak').textContent = S.streak;
+  $('#hudOk').textContent = S.ok; $('#hudMiss').textContent = S.miss; $('#hudStreak').textContent = S.streak;
   $('#progress').style.width = (L.length ? Math.max(0, (i + 1) / L.length * 100) : 0) + '%';
   const b = activeBlank(L[i]);
   $('#gHint').disabled = $('#gSkip').disabled = !b;
-  if (settings.mode === 'choice') {
+  if (settings.mode === 'choice' && Date.now() >= padFreezeUntil) {   // while frozen, keep showing the answer feedback
     if (b && !b.options) b.options = makeOptions(b, L[i]);
     $$('#pad .opt').forEach((btn, k) => {
       const o = b && b.options[k];
@@ -974,10 +1141,13 @@ async function fetchTr(text) {
   } catch { }
   return null;
 }
-async function translateLine(line) {
-  if (!settings.translate || line.tr) return;
+async function translateLine(line, force = false) {
+  if ((!settings.translate && !force) || line.tr || line.trBusy || line.trFail) return;
+  line.trBusy = true;
   const tr = await fetchTr(line.text);
-  if (tr) { line.tr = tr; renderGame(); }
+  line.trBusy = false;
+  if (tr) line.tr = tr; else line.trFail = true;
+  if (S.phase === 'karaoke') paintKarLine(S.lines.indexOf(line)); else renderGame();
 }
 
 /* ================= saved phrases ================= */
@@ -1021,20 +1191,39 @@ function sheetClip(p) {
     events: { onReady: e => e.target.playVideo() }
   });
 }
-function finish() {
+function finish() { showResults(true); }
+/* completed = song reached its end (+10 bonus); otherwise the player ended early with "Encerrar" */
+function showResults(completed) {
   S.finished = true;
-  stat('songs');
-  if (!lib.stats.uniq.includes(S.videoId)) lib.stats.uniq.push(S.videoId);
+  if (playerReady) player.pauseVideo();
+  if (completed) {
+    S.score += SONG_BONUS;
+    stat('songs');
+    if (!lib.stats.uniq.includes(S.videoId)) lib.stats.uniq.push(S.videoId);
+  }
   const all = S.lines.flatMap(l => l.blanks.map(b => ({ b, l })));
-  const ok = all.filter(x => x.b.solved && !x.b.missed).length;
-  const acc = all.length ? Math.round(ok / all.length * 100) : 0;
-  S.v.best = Math.max(S.v.best || 0, S.score); saveLib();
+  const played = all.filter(x => x.b.solved);
+  const acc = played.length ? Math.round(S.ok / played.length * 100) + '%' : '—';
+  const newBest = completed && S.score > (S.v.best || 0);
+  if (completed) S.v.best = Math.max(S.v.best || 0, S.score);
+  saveLib();
   const missed = all.filter(x => x.b.missed || x.b.attempts > 0);
   const hasNext = S.queue && S.queue.idx + 1 < S.queue.ids.length;
-  openSheet(`<h3>🎉 Fim da música!</h3>
-    <div class="stats"><div><b>${S.score}</b><span>pontos</span></div><div><b>${acc}%</b><span>acertos</span></div><div><b>${S.v.best}</b><span>recorde</span></div></div>
+  openSheet(`<h3>${completed ? '🎉 Fim da música!' : 'Música encerrada'}</h3>
+    <div class="stats four">
+      <div><b>${S.score}</b><span>pontos</span></div>
+      <div><b class="okc">${S.ok}</b><span>certas</span></div>
+      <div><b class="badc">${S.miss}</b><span>erros</span></div>
+      <div><b>${acc}</b><span>precisão</span></div>
+    </div>
+    <div class="scoreline">
+      <span>${S.ok} palavra${S.ok === 1 ? '' : 's'} × 1</span>
+      <span>${completed ? `música completa <b>+${SONG_BONUS}</b>` : `sem bônus (encerrada ${S.lines.length ? Math.round((S.cur + 1) / S.lines.length * 100) : 0}%)`}</span>
+      <span>🔥 melhor sequência <b>${S.bestStreak}</b></span>
+      <span>${newBest ? '🏆 <b>novo recorde!</b>' : `recorde <b>${S.v.best || '—'}</b>`}</span>
+    </div>
     ${(() => { const t = todayStats(), lv = levelOf(xpOf(lib.stats)), sk = dayStreak(); return `<div class="todayline"><span>Hoje <b>${t.words}/${settings.goal}</b> palavras</span><span>🔥 <b>${sk}</b> dia${sk === 1 ? "" : "s"}</span><span>Nível <b>${lv.level}</b></span></div>`; })()}
-    ${missed.length ? `<p class="muted">Palavras para revisar · 🔖 salva a frase</p><ul class="missed">${missed.map(x => `<li><div><b>${esc(x.b.answer)}</b> — ${esc(x.l.text)}${x.l.tr ? `<div class="tr">${esc(x.l.tr)}</div>` : ''}</div>${bmBtn(!!findPhrase(S.videoId, x.l.text), `data-a="bm" data-i="${S.lines.indexOf(x.l)}" style="position:static;transform:none"`)}</li>`).join('')}</ul>` : '<p class="muted" style="text-align:center">Perfeito, nenhum erro! 🏆</p>'}
+    ${missed.length ? `<p class="muted">Palavras para revisar · 🔖 salva a frase</p><ul class="missed">${missed.map(x => `<li><div><b>${esc(x.b.answer)}</b> — ${esc(x.l.text)}${x.l.tr ? `<div class="tr">${esc(x.l.tr)}</div>` : ''}</div>${bmBtn(!!findPhrase(S.videoId, x.l.text), `data-a="bm" data-i="${S.lines.indexOf(x.l)}" style="position:static;transform:none"`)}</li>`).join('')}</ul>` : played.length ? '<p class="muted" style="text-align:center">Nenhum erro! 🏆</p>' : ''}
     <div class="sheetbtns" style="flex-direction:column">
       ${hasNext ? '<button class="btn primary" data-a="next">Próxima música ▶</button>' : ''}
       <button class="btn ${hasNext ? '' : 'primary'}" data-a="again">Jogar de novo</button>
@@ -1044,20 +1233,106 @@ function finish() {
     again: () => { closeSheet(); startGame(); },
     close: () => { closeSheet(); quitGame(); },
     bm: async (e, el) => { e.stopPropagation(); const on = await toggleSavePhrase(S.lines[+el.dataset.i]); el.classList.toggle('on', on); el.innerHTML = icon(on ? 'bm-f' : 'bm'); }
-  });
+  }, quitGame);
+}
+
+/* ================= karaoke ================= */
+/* The song plays with the whole lyric on screen; the sung verse is highlighted and the translation can sit beside or below it. */
+const KAR_TR = { side: 'Tradução ao lado', below: 'Tradução abaixo', off: 'Sem tradução' };
+let karUserScroll = 0;
+async function startKaraoke() {
+  if (!playerReady) { toast('O vídeo ainda está carregando…'); return; }
+  buildLines();
+  Object.assign(S, { phase: 'karaoke', cur: -1, maxCur: -1, hold: null, waiting: false, finished: false });
+  showPane('pKaraoke'); document.body.classList.add('playing'); closeSheet();
+  renderKaraoke();
+  $('#kSpeed').innerHTML = `<b>${settings.speed}x</b><span>Velocidade</span>`;
+  player.seekTo(0, true); player.setPlaybackRate(settings.speed); player.playVideo();
+  window.scrollTo(0, 0);
+  translateAllKaraoke();
+  try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { }
+}
+function renderKaraoke() {
+  const box = $('#kList'), mode = settings.lang === 'pt' ? 'off' : settings.karTr;
+  box.className = 'klist ' + mode;
+  $('#kTr').textContent = KAR_TR[mode];
+  $('#kTr').disabled = settings.lang === 'pt';
+  box.innerHTML = '<div class="kpad"></div>' + S.lines.map((l, i) => `<div class="kline" data-i="${i}">
+      <div class="ko">${esc(l.text)}</div><div class="kt"></div>${bmBtn(!!findPhrase(S.videoId, l.text), `data-kbm="${i}"`)}</div>`).join('') + '<div class="kpad"></div>';
+  S.lines.forEach((_, i) => paintKarLine(i));
+  markKarCur(true);
+}
+function paintKarLine(i) {
+  const l = S.lines[i], row = $(`#kList .kline[data-i="${i}"]`); if (!l || !row) return;
+  row.querySelector('.kt').innerHTML = l.tr ? esc(l.tr) : (l.trFail ? '' : '<span class="trwait">…</span>');
+}
+async function translateAllKaraoke() {
+  if (settings.lang === 'pt' || settings.karTr === 'off') return;
+  // nearest verses first, so what is about to be sung is ready before the rest
+  const start = Math.max(0, S.cur), order = S.lines.map((l, i) => i).sort((a, b) => (a < start) - (b < start) || Math.abs(a - start) - Math.abs(b - start));
+  for (const i of order) {
+    if (S.phase !== 'karaoke') return;
+    await translateLine(S.lines[i], true);
+  }
+}
+function markKarCur(instant = false) {
+  $$('#kList .kline').forEach(r => { const i = +r.dataset.i; r.classList.toggle('on', i === S.cur); r.classList.toggle('past', i < S.cur); });
+  $('#kProgress').style.width = (S.lines.length ? Math.max(0, (S.cur + 1) / S.lines.length * 100) : 0) + '%';
+  $('#kBack').disabled = S.cur <= 0;
+  if (Date.now() - karUserScroll < 4000) return;   // the user is reading elsewhere; don't yank the list
+  const box = $('#kList'), row = $(`#kList .kline[data-i="${Math.max(0, S.cur)}"]`); if (!row) return;
+  box.scrollTo({ top: row.offsetTop - box.clientHeight / 2 + row.offsetHeight / 2, behavior: instant ? 'auto' : 'smooth' });
+}
+function tickKaraoke(L) {
+  const idx = currentIdx(L);
+  if (idx !== S.cur) {
+    S.cur = idx;
+    if (idx > S.maxCur && idx >= 0) stat('lines');
+    S.maxCur = Math.max(S.maxCur, idx);
+    markKarCur();
+  }
+}
+function karaokeSeek(i) {
+  const l = S.lines[Math.max(0, Math.min(S.lines.length - 1, i))]; if (!l) return;
+  karUserScroll = 0;
+  S.hold = S.lines.indexOf(l);
+  seekLyric(l.t - 0.3); player.playVideo();
+}
+function karaokeBack() {
+  const l = S.lines[S.cur];
+  // early in a verse → previous verse; later → restart this one
+  karaokeSeek(l && lyricTime() - l.t > 2.5 ? S.cur : S.cur - 1);
+}
+function karaokeEnd() {
+  S.finished = true;
+  openSheet(`<h3>🎤 Fim do karaokê!</h3>
+    <p class="muted" style="text-align:center;margin:0 0 6px">Agora que você conhece a letra, que tal completar as lacunas?</p>
+    <div class="sheetbtns" style="flex-direction:column">
+      <button class="btn primary" data-a="game">Jogar com lacunas</button>
+      <button class="btn" data-a="again">Cantar de novo</button>
+      <button class="btn" data-a="close">Fechar</button>
+    </div>`, {
+    game: () => { closeSheet(); endPlay(); startGame(); },
+    again: () => { closeSheet(); startKaraoke(); },
+    close: () => { closeSheet(); quitGame(); }
+  }, quitGame);
 }
 
 /* ================= sheets ================= */
-function openSheet(html, actions = {}) {
+let sheetOnDismiss = null;   // run when the sheet is dismissed by tapping outside / Esc
+function openSheet(html, actions = {}, onDismiss = null) {
+  sheetOnDismiss = onDismiss;
   $('#sheetContent').innerHTML = html;
   $$('#sheetContent [data-a]').forEach(el => { const f = actions[el.dataset.a]; if (f) el.addEventListener('click', e => f(e, el)); });
   $('#sheet').classList.remove('hidden');
 }
 function closeSheet() {
+  sheetOnDismiss = null;
   $('#sheet').classList.add('hidden');
   if (clipPlayer) { try { clipPlayer.destroy(); } catch { } clipPlayer = null; }
 }
-$('#sheetBg').onclick = closeSheet;
+function dismissSheet() { const f = sheetOnDismiss; closeSheet(); if (f) f(); }
+$('#sheetBg').onclick = dismissSheet;
 
 function seg(name, opts, value) {
   return `<div class="seg small" data-seg="${name}">${opts.map(([v, l]) => `<button data-v="${v}" class="${String(v) === String(value) ? 'on' : ''}">${l}</button>`).join('')}</div>`;
@@ -1077,7 +1352,7 @@ function sheetSettings() {
     <div class="grouplabel">Idioma</div>
     <div class="field"><label>Idioma das músicas</label>${seg('lang', [['en', 'EN'], ['es', 'ES'], ['fr', 'FR'], ['it', 'IT'], ['de', 'DE'], ['pt', 'PT']], settings.lang)}</div>
     <div class="group">
-      ${swRow('Tradução para português', 'translate', 'Mostrada no cartão da frase anterior')}
+      ${swRow('Tradução para português', 'translate', 'Mostrada embaixo do verso que está tocando')}
       ${swRow('Sons de acerto', 'sounds')}
     </div>
 
@@ -1116,7 +1391,8 @@ function applySetting(k, v, group) {
   if (group) group.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.v === String(v)));
   if (k === 'mode' && S.phase === 'play') { applyMode(); renderGame(); }
   if (k === 'pace' && S.phase === 'play') { S.waiting = false; setRing(0); player.playVideo(); renderGame(); }
-  if (k === 'speed' && playerReady) { player.setPlaybackRate(v); $('#gSpeed').innerHTML = `<b>${v}x</b><span>Velocidade</span>`; }
+  if (k === 'speed' && playerReady) { player.setPlaybackRate(v); setSpeedLabels(); }
+  if (k === 'lang' && S.phase === 'karaoke') { S.lines.forEach(l => { l.tr = null; l.trFail = false; }); renderKaraoke(); translateAllKaraoke(); }
   if (S.phase === 'ready') renderReady();
 }
 function sheetSongMore() {
@@ -1129,15 +1405,17 @@ function sheetSongMore() {
     </div>
     <div class="grouplabel">Letra</div>
     <div class="group">
-      ${has ? `<button class="grow" data-a="resync">${icon('sync')}<span>Sincronizar de novo<small>Marcar o tempo de cada frase outra vez</small></span></button>
+      ${has ? `<button class="grow" data-a="kar">${icon('note')}<span>Modo karaokê<small>A letra rola junto com a música, com tradução</small></span></button>
+      <button class="grow" data-a="resync">${icon('sync')}<span>Sincronizar de novo<small>Marcar o tempo de cada frase outra vez</small></span></button>
       <button class="grow" data-a="edit">${icon('edit')}<span>Editar LRC<small>Corrigir texto ou tempos</small></span></button>` : ''}
       <button class="grow" data-a="change">${icon('text')}<span>${has ? 'Trocar letra' : 'Buscar ou colar letra'}</span></button>
     </div>`, {
     pl: () => sheetAddToPlaylist(v),
     yt: () => { closeSheet(); window.open('https://www.youtube.com/watch?v=' + v.id, '_blank', 'noopener'); },
-    resync: () => { closeSheet(); if (S.phase === 'play') quitGame(); startSync(S.entries.filter(e => e.text).map(e => e.text)); },
+    kar: () => { closeSheet(); startKaraoke(); },
+    resync: () => { closeSheet(); if (inSession()) quitGame(); startSync(S.entries.filter(e => e.text).map(e => e.text)); },
     edit: () => sheetEditLRC(),
-    change: () => { closeSheet(); if (S.phase === 'play') quitGame(); S.phase = 'lyrics'; showPane('pLyrics'); prefillLyrics(); }
+    change: () => { closeSheet(); if (inSession()) quitGame(); S.phase = 'lyrics'; showPane('pLyrics'); prefillLyrics(); }
   });
 }
 function sheetEditLRC() {
@@ -1229,21 +1507,49 @@ $('#playBtn').onclick = startGame;
 ['#lPrev', '#lCur'].forEach(sel => $(sel).addEventListener('click', e => { const b = e.target.closest('[data-bm]'); if (b) toggleSavePhrase(S.lines[+b.dataset.bm]); }));
 $('#gBack').onclick = goBackVerse;
 $('#answerForm').onsubmit = e => { e.preventDefault(); submitAnswer($('#answer').value); };
-$$('#pad .opt').forEach(btn => btn.onclick = () => { if (btn.textContent) submitAnswer(btn.textContent); });
+$$('#pad .opt').forEach(btn => btn.onclick = () => { if (btn.textContent && Date.now() >= padFreezeUntil) submitAnswer(btn.textContent); });
 $$('.replayBtn').forEach(b => b.onclick = () => { setStatus('🔁 Ouvindo de novo…', 'info'); replayLine(); });
 $('#gHint').onclick = giveHint;
 $('#gSkip').onclick = skipBlank;
 $('#gPause').onclick = () => { if (S.waiting) return replayLine(); player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo(); };
-$('#gSpeed').onclick = () => { settings.speed = { 1: 0.75, 0.75: 0.5, 0.5: 1 }[settings.speed] || 1; saveSettings(); player.setPlaybackRate(settings.speed); $('#gSpeed').innerHTML = `<b>${settings.speed}x</b><span>Velocidade</span>`; };
-$('#gQuit').onclick = quitGame;
+function setSpeedLabels() { ['#gSpeed', '#kSpeed'].forEach(s => $(s).innerHTML = `<b>${settings.speed}x</b><span>Velocidade</span>`); }
+const cycleSpeed = () => { settings.speed = { 1: 0.75, 0.75: 0.5, 0.5: 1 }[settings.speed] || 1; saveSettings(); player.setPlaybackRate(settings.speed); setSpeedLabels(); };
+$('#gSpeed').onclick = cycleSpeed;
+$('#gQuit').onclick = confirmQuit;
 $('#gSet').onclick = sheetSettings;
+$('#skipIntro').onclick = skipToLyrics;
+
+$('#karBtn').onclick = startKaraoke;
+$('#kQuit').onclick = confirmQuit;
+$('#kSet').onclick = sheetSettings;
+$('#kSpeed').onclick = cycleSpeed;
+$('#kPause').onclick = () => player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo();
+$('#kBack').onclick = karaokeBack;
+$('#kNext').onclick = () => karaokeSeek(S.cur + 1);
+$('#kTr').onclick = () => {
+  settings.karTr = { side: 'below', below: 'off', off: 'side' }[settings.karTr] || 'side'; saveSettings();
+  renderKaraoke(); translateAllKaraoke();
+};
+$('#kList').addEventListener('click', async e => {
+  const bm = e.target.closest('[data-kbm]');
+  if (bm) { const on = await toggleSavePhrase(S.lines[+bm.dataset.kbm]); bm.classList.toggle('on', on); bm.innerHTML = icon(on ? 'bm-f' : 'bm'); return; }
+  const row = e.target.closest('.kline'); if (row) karaokeSeek(+row.dataset.i);
+});
+['wheel', 'touchmove'].forEach(ev => $('#kList').addEventListener(ev, () => { karUserScroll = Date.now(); }, { passive: true }));
 
 ['input', 'pointerdown', 'keydown'].forEach(ev => document.addEventListener(ev, () => { S.lastActivity = Date.now(); if (S.waiting) setRing(0); }, true));
 document.addEventListener('visibilitychange', async () => { if (document.visibilityState === 'visible' && S.phase === 'play' && !wakeLock) { try { wakeLock = await navigator.wakeLock?.request('screen'); } catch { } } });
 
 document.addEventListener('keydown', e => {
   const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
-  if (e.key === 'Escape' && !$('#sheet').classList.contains('hidden')) { closeSheet(); return; }
+  if (e.key === 'Escape' && !$('#sheet').classList.contains('hidden')) { dismissSheet(); return; }
+  if (!$('#sheet').classList.contains('hidden')) return;
+  if (S.phase === 'karaoke' && !typing) {
+    if (e.code === 'Space') { e.preventDefault(); $('#kPause').click(); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); karaokeBack(); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); karaokeSeek(S.cur + 1); }
+    else if (e.key === 'Escape') confirmQuit();
+  }
   if (S.phase === 'sync' && !typing) {
     if (e.code === 'Space') { e.preventDefault(); syncMark(); }
     else if (e.key === 'Backspace') { e.preventDefault(); syncUndo(); }

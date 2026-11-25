@@ -362,3 +362,66 @@ body.playing #song{padding-top:var(--st)}
 .heatfoot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px}
 .heatfoot .heatlegend{margin-top:0;flex:none}
 .heatcap{font-size:12px;color:var(--text2);min-width:0}
+
+/* ============ v2: counters, skip intro, current-verse translation, karaoke, search filter ============ */
+.grow1{flex:1}
+.endbtn{display:inline-flex;align-items:center;gap:6px;height:36px;padding:0 13px 0 9px;border-radius:999px;background:rgba(244,63,94,.12);color:#fb7185;font-size:13.5px;font-weight:700}
+.endbtn svg{width:16px;height:16px}
+.bar.thin{flex:none;height:4px;margin:10px 0 0}
+.pill.okp b{color:var(--ok)} .pill.badp b{color:var(--bad)}
+.stats.four{grid-template-columns:repeat(4,1fr)}
+.stats.four b{font-size:21px}
+.stats .okc{color:var(--ok)} .stats .badc{color:var(--bad)}
+.scoreline{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;background:rgba(139,92,246,.1);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--text2);margin-bottom:10px}
+.scoreline b{color:var(--text)}
+
+/* translation under the verse being sung: bigger and right there */
+.tr.trcur{font-size:17px;font-weight:500;margin-top:10px;line-height:1.35;color:color-mix(in srgb,var(--a2) 85%,#fff);letter-spacing:0}
+.trwait{opacity:.45;font-size:.85em}
+@media (min-width:700px){ .tr.trcur{font-size:19px} }
+
+/* skip intro / instrumental, floating over the video */
+.skipintro{position:absolute;right:10px;bottom:10px;z-index:3;display:flex;align-items:center;gap:6px;padding:9px 14px 9px 11px;border-radius:999px;background:rgba(10,10,18,.82);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#fff;font-size:13.5px;font-weight:700;border:1px solid rgba(255,255,255,.18);box-shadow:0 6px 18px rgba(0,0,0,.45);animation:fadein .25s}
+.skipintro svg{width:16px;height:16px}
+
+/* ready: two CTAs */
+.ctarow{display:flex;gap:10px}
+.ctarow .cta{flex:1.4}
+.ctarow .cta.alt{flex:1;background:var(--s2);color:var(--text);box-shadow:none;border:1px solid var(--line)}
+
+/* karaoke */
+.klist{position:relative;height:calc(100dvh - 56.25vw - var(--st) - var(--sb) - 190px);min-height:240px;overflow-y:auto;margin-top:6px;scrollbar-width:none;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 86%,transparent 100%);mask-image:linear-gradient(180deg,transparent 0,#000 14%,#000 86%,transparent 100%)}
+@media (min-width:640px){ .klist{height:calc(100dvh - 360px - var(--st) - var(--sb) - 190px)} }
+.klist::-webkit-scrollbar{display:none}
+.kpad{height:40%}
+.kline{position:relative;padding:9px 38px 9px 6px;border-radius:12px;cursor:pointer;transition:opacity .3s,background .3s;opacity:.45}
+.kline.past{opacity:.3}
+.kline.on{opacity:1;background:rgba(139,92,246,.1)}
+.ko{font-size:17px;font-weight:650;line-height:1.35;transition:font-size .2s,color .2s}
+.kline.on .ko{font-size:22px;font-weight:750;color:#fff}
+.kt{font-size:14.5px;line-height:1.35;color:var(--a2);font-style:italic}
+.kline.on .kt{font-size:17px;color:color-mix(in srgb,var(--a2) 85%,#fff)}
+.klist.below .kt{margin-top:3px}
+.klist.side .kline{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:center}
+.klist.side .kt{border-left:2px solid var(--line);padding-left:12px}
+.klist.off .kt{display:none}
+.kline .bm{opacity:0;transition:opacity .2s}
+.kline.on .bm,.kline:hover .bm,.kline .bm.on{opacity:1}
+@media (min-width:700px){ .kline.on .ko{font-size:26px} }
+
+/* search filter + lyrics badge */
+.searchfilt{margin:-4px 0 14px}
+.searchfilt button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.searchfilt svg{width:15px;height:15px}
+.badge.warn{background:rgba(251,191,36,.14);color:var(--warn)}
+@media (max-width:699px){ .klist.side .kline.on .ko{font-size:19px} .klist.side .kline.on .kt{font-size:15.5px} .klist.side .ko{font-size:15.5px} .klist.side .kt{font-size:13.5px} }
+
+/* answer feedback on the options pad and the typing box */
+.opt.pick-ok{background:color-mix(in srgb,var(--ok) 55%,var(--s1));border-color:var(--ok);box-shadow:0 4px 0 color-mix(in srgb,var(--ok) 45%,#000);animation:pickok .45s}
+.opt.pick-bad{background:color-mix(in srgb,var(--bad) 55%,var(--s1));border-color:var(--bad);box-shadow:0 4px 0 color-mix(in srgb,var(--bad) 45%,#000);animation:pickbad .5s}
+.opt.pick-right{border-color:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 35%,transparent),0 4px 0 color-mix(in srgb,var(--ok) 45%,#000);animation:pickok .6s .15s both}
+@keyframes pickok{40%{transform:scale(1.07)}}
+@keyframes pickbad{15%,55%{transform:translateX(-7px)}35%,75%{transform:translateX(7px)}}
+#answer.shake{animation:pickbad .45s;border-color:var(--bad)}
+.intro{margin:4px 2px 12px;font-size:14.5px;line-height:1.5;color:var(--text2)} .intro b{color:var(--text)}

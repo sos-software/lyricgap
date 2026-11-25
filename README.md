@@ -31,8 +31,28 @@ Jogo para aprender idiomas completando a letra de músicas do YouTube. A música
 2. **Letra:** o app procura a letra sincronizada automaticamente.
    - **Achou:** toque no resultado marcado como *SINCRONIZADA*.
    - **Não achou:** vá em **Colar**, cole a letra (uma frase por linha) e faça a **sincronização**. Dê play e toque **MARCAR** no instante em que cada frase começa. É feito uma vez só e fica salvo.
-3. Toque no botão ▶ grande para jogar.
-4. No fim aparecem pontos, porcentagem de acertos, recorde e a lista de **palavras para revisar**.
+3. Toque em **▶ Jogar** (lacunas) ou em **🎤 Karaokê** (só cantar junto, com tradução).
+4. Se o clipe tiver uma introdução longa, toque em **⏭ Pular para a letra** (aparece sobre o vídeo).
+5. No fim aparecem pontos, palavras certas, erros, precisão, recorde e a lista de **palavras para revisar**.
+
+### Pontuação
+
+Contadores simples, sem números inflados:
+
+| Ação | Pontos |
+|---|---|
+| Palavra certa | **+1** |
+| Música completa (jogada até o fim) | **+10** |
+
+Na tela de jogo ficam três contadores: **✓ certas**, **✗ erros** e **🔥 acertos seguidos**. O recorde de cada música é o maior total de pontos. Dica, velocidade e tempo de resposta não mudam os pontos. O XP do nível usa a mesma regra.
+
+### Encerrar
+
+O botão **✕ Encerrar** (no topo, durante o jogo ou o karaokê) pausa a música e pergunta se você quer sair. Encerrando, aparece o resultado parcial: as palavras certas já contam no progresso, mas o bônus de +10 fica só para quem termina a música.
+
+### Modo karaokê
+
+A música toca e a **letra inteira rola sozinha**, com o verso cantado em destaque. O botão no topo alterna a tradução: **ao lado**, **abaixo** ou **sem tradução**. Tocar num verso pula para ele; ⏮/⏭ vão para o verso anterior/próximo; 🔖 salva a frase. No PC: espaço pausa, ← → trocam de verso. Não tem lacunas nem pontos.
 
 ## Modos de jogo
 
@@ -40,13 +60,13 @@ Jogo para aprender idiomas completando a letra de músicas do YouTube. A música
 
 | Modo | Como funciona |
 |---|---|
-| **🌊 Fluxo** (padrão) | A música **nunca para**. As opções aparecem enquanto o verso toca. Acertou: pontos (quanto mais rápido, mais pontos) e sequência 🔥. Errou ou não respondeu a tempo: a palavra é revelada em cor neutra, **sem som de erro e sem voltar**. Os erros aparecem só no final. O anel do botão central mostra o tempo restante do verso. |
-| **⏸ Pausa** | O vídeo **pausa no fim de cada frase** com lacuna. Acertou: continua. Errou: **volta a frase** e toca de novo. Na 3ª vez que errar, a resposta aparece. Se você demorar, o trecho repete sozinho (padrão: 8s, configurável). |
+| **🌊 Fluxo** | A música **nunca para**. As opções aparecem enquanto o verso toca. Acertou: +1 e sequência 🔥. Errou: a opção treme em vermelho, a certa acende em verde e a música segue **sem voltar**. Se o verso passar sem resposta, a palavra é revelada em silêncio. O anel do botão central mostra o tempo restante do verso. |
+| **⏸ Pausa** (padrão) | O vídeo **pausa no fim de cada frase** com lacuna. Acertou: continua. Errou: **volta a frase** e toca de novo. Na 3ª vez que errar, a resposta aparece. Se você demorar, o trecho repete sozinho (padrão: 8s, configurável). |
 
 ### Forma de responder
 
-- **Múltipla escolha** (padrão no celular): 4 opções em formato de **cruz**. No PC, as setas ↑ ← → ↓ ou as teclas 1 a 4 escolhem a opção.
-- **Digitando** (padrão no PC): pequenos erros de digitação são aceitos em palavras de 5 letras ou mais, e maiúsculas/acentos não importam.
+- **Múltipla escolha** (padrão): 4 opções em formato de **cruz**. No PC, as setas ↑ ← → ↓ ou as teclas 1 a 4 escolhem a opção.
+- **Digitando**: pequenos erros de digitação são aceitos em palavras de 5 letras ou mais, e maiúsculas/acentos não importam.
 
 ### Dificuldade
 
@@ -62,20 +82,22 @@ As palavras escolhidas evitam artigos e palavras muito curtas. As opções errad
 |---|---|
 | ⏮ **Voltar** | Volta para o verso anterior e a música continua dali. Toques rápidos seguidos voltam mais versos. Um verso revisitado aparece completo, com a tradução e o 🔖 para salvar. No PC: Backspace. |
 | 🔁 **Centro / ouvir de novo** | Repete o verso atual. No PC: Esc (ou espaço, na múltipla escolha). |
-| 💡 **Dica** | Na múltipla escolha, elimina uma opção errada. Digitando, revela uma letra. Usar dica reduz os pontos. |
+| 💡 **Dica** | Na múltipla escolha, elimina uma opção errada. Digitando, revela uma letra. Usar dica não tira pontos. |
 | ⏸ **Pausa** | Pausa ou continua a música. |
 | ⏭ **Pular** | Pula a lacuna (só no modo Pausa). |
 | **Velocidade** | Alterna entre 1x, 0.75x e 0.5x. |
 | 🔖 | Salva a frase (fica no cartão da frase anterior, nos versos revisitados e na lista do fim da música). |
-| ✕ / ⚙ | Sair do jogo / configurações. |
+| ✕ **Encerrar** / ⚙ | Encerrar a música (com confirmação e resultado parcial) / configurações. |
+| ⏭ **Pular para a letra** | Aparece sobre o vídeo quando falta mais de 5 s para o próximo verso (introdução do clipe ou solo). Pula para logo antes dele. |
 
-**Tela de jogo:** fica só a **frase atual** (com a lacuna). Acima dela, um cartão discreto mostra a **frase anterior completa e a tradução**. Assim dá para entender o significado enquanto você já ouve a próxima.
+**Tela de jogo:** a **frase atual** (com a lacuna) aparece com a **tradução logo embaixo, em letra maior**, enquanto o verso toca. Acima dela, um cartão discreto mostra a frase anterior completa, também com a tradução.
 
 ## Biblioteca: favoritos, playlists e frases salvas
 
 - **☆ Favoritos:** a estrela ao lado de qualquer música ou na barra da música.
 - **＋ Playlists:** adicione músicas a playlists. Uma playlist toca em sequência, e no fim de cada música aparece **"Próxima música ▶"**.
 - **Recentes:** últimas 50 músicas abertas.
+- **Músicas de exemplo:** na primeira vez que o app abre, 12 músicas já aparecem em *Recentes* para começar sem buscar (The Strokes, Sia, Coldplay, Ben E. King, Black Eyed Peas, Angels & Airwaves, Journey, Queen, AURORA, The Cranberries e Sixpence None The Richer). Todas têm letra sincronizada no LRCLIB. Quem já usava o app recebe as músicas uma vez, depois das suas. A lista fica em `SAMPLES`, no `app.js`.
 - **🔖 Frases:** cada frase salva guarda:
   - o texto completo e a tradução;
   - a música (título e artista);
@@ -91,7 +113,7 @@ O card **Meta de hoje**, no topo da tela inicial, aparece depois do primeiro jog
 
 - **Anel da meta diária:** palavras certas hoje sobre a meta (padrão 20; dá para mudar para 10, 30, 50 ou 100).
 - **🔥 Dias seguidos:** dias consecutivos com atividade. Conta até ontem, então ainda dá tempo de manter a sequência hoje.
-- **Nível:** sobe com XP. Cada palavra certa vale 10, cada verso tocado vale 2 e cada música completa vale 50. A barra mostra quanto falta para o próximo nível.
+- **Nível:** sobe com XP. Cada palavra certa vale 1 e cada música completa vale 10 (níveis em 10, 40, 90, 160… XP). A barra mostra quanto falta para o próximo nível.
 - **Contadores totais:** músicas ouvidas (completas), versos tocados e palavras certas.
 - **Heatmap das últimas 20 semanas:** um quadrado por dia, mais claro quanto mais palavras certas naquele dia (cheio = meta batida). O dia de hoje tem contorno.
 
@@ -138,6 +160,7 @@ Nenhuma dessas partes usa o Google.
 
 ### Busca de vídeos
 
+- **Filtro Músicas / Todos os vídeos:** por padrão a busca traz só **músicas** (YouTube Music: primeiro o áudio oficial do álbum, que bate com o tempo das letras e não tem introdução de clipe, depois os clipes oficiais). Cada resultado ganha um selo do LRCLIB: **LETRA ✓** (sincronizada), **SÓ TEXTO** (você sincroniza) ou **SEM LETRA**. Para palestras e outros vídeos, escolha **Todos os vídeos**.
 - **Sem configurar nada:** a busca usa servidores públicos do [Piped](https://github.com/TeamPiped/Piped), um front-end alternativo e aberto do YouTube. Eles são gratuitos, mas **às vezes ficam fora do ar**. O app tenta vários e lembra qual funcionou.
 - **Com uma chave da API do YouTube** (⚙ → *Busca de vídeos*): a busca usa a API oficial e fica estável. A chave é grátis no Google Cloud (YouTube Data API v3), com cerca de 100 buscas por dia, e fica salva só no seu aparelho.
 - **Sempre funciona:** colar o link do vídeo na caixa de busca.
@@ -174,14 +197,14 @@ Em ⚙ → *Biblioteca*:
 
 | Opção | Padrão |
 |---|---|
-| Ritmo (Fluxo / Pausa) | Fluxo |
+| Ritmo (Fluxo / Pausa) | Pausa em cada frase |
 | Dificuldade | Médio |
-| Responder (escolha / digitando) | Escolha no celular, digitando no PC |
+| Responder (escolha / digitando) | Múltipla escolha |
 | Modo pausa: repetir o trecho se demorar | 8s |
 | Velocidade | 1x |
 | Idioma das músicas | Inglês |
 | Tradução PT-BR | Ligada |
-| Sons de acerto/erro | Ligados (no Fluxo não há som de erro) |
+| Sons de acerto/erro | Ligados |
 | Sincronia desta música (−/+) | 0.0s. Use − se a letra aparece antes da voz |
 | Chave da API do YouTube | Vazia (usa os servidores Piped) |
 
@@ -217,6 +240,8 @@ node server.js
 - `lg:tr`: cache de traduções.
 
 **Como o jogo decide os tempos:** cada frase vai do seu tempo no LRC até o início da próxima (no máximo 10s). No modo Pausa, o vídeo pausa 0,15s antes do fim da frase. No Fluxo, a frase que termina sem resposta é revelada em silêncio.
+
+**Feedback de resposta:** acertou, a opção fica verde e o verso pulsa. Errou, a opção treme em vermelho (o celular vibra, no Android), o verso balança e toca o som de erro. Quando a resposta é revelada, a opção certa acende em verde. Os botões ficam parados por ~1 s para dar tempo de ver. Digitando, a caixa de texto treme em vermelho.
 
 ## Limitações conhecidas
 
