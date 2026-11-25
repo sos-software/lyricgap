@@ -88,6 +88,7 @@ As palavras escolhidas evitam artigos e palavras muito curtas. As opções errad
 | **Velocidade** | Alterna entre 1x, 0.75x e 0.5x. |
 | 🔖 | Salva a frase (fica no cartão da frase anterior, nos versos revisitados e na lista do fim da música). |
 | ✕ **Encerrar** / ⚙ | Encerrar a música (com confirmação e resultado parcial) / configurações. |
+| ⏱ **Verso cortado? Ajustar tempo** | Fica embaixo do verso (e acende quando o jogo pausa para responder). Abre o ajuste do tempo **só daquele verso**: *Ouvir o verso* toca exatamente o trecho; − / + movem o início ou o fim em 0,25s; *Marcar início* / *Marcar fim* tocam o trecho e você toca de novo no instante em que a voz começa ou termina. *Salvar este verso* grava na letra da música (LRC) e o verso toca de novo já com o tempo certo. Se o fim passar do começo do próximo verso, o próximo começa mais tarde; se ficar antes, o app grava uma marca de fim. No karaokê, o mesmo ajuste fica no ícone ⏱ de cada verso. Se **a música toda** estiver adiantada ou atrasada, use a *Sincronia geral* no mesmo painel. |
 | ⏭ **Pular para a letra** | Aparece sobre o vídeo quando falta mais de 5 s para o próximo verso (introdução do clipe ou solo). Pula para logo antes dele. |
 
 **Tela de jogo:** a **frase atual** (com a lacuna) aparece com a **tradução logo embaixo, em letra maior**, enquanto o verso toca. Acima dela, um cartão discreto mostra a frase anterior completa, também com a tradução.
@@ -141,7 +142,7 @@ Os números ficam no aparelho (junto com a biblioteca) e entram no backup.
 
 ## De onde vêm a letra, a tradução e a busca
 
-Nenhuma dessas partes usa o Google.
+O Google só entra quando você pede uma tradução melhor (veja abaixo).
 
 ### Letra: [LRCLIB](https://lrclib.net)
 
@@ -157,6 +158,19 @@ Nenhuma dessas partes usa o Google.
 - **Qualidade:** boa para entender o sentido geral, mas literal. Gírias, expressões idiomáticas e metáforas podem sair erradas ou estranhas.
 - **Limite gratuito:** cerca de 5.000 caracteres por dia (umas 3 músicas novas por dia). As traduções ficam guardadas no aparelho, então repetir uma música não gasta o limite.
 - O idioma de origem é escolhido em ⚙ → *Idioma das músicas*. O destino é sempre português (PT-BR).
+
+### Melhorar uma tradução (✎)
+
+Ao lado de cada tradução (verso atual, cartão do verso anterior, karaokê e frases salvas) há um **✎**. Ele abre o painel *Tradução do verso* com:
+
+- **Automática (MyMemory):** a que o app usa por padrão;
+- **Google Tradutor:** buscada na hora, muitas vezes mais natural;
+- **Minha tradução:** escreva com suas palavras (ou cole uma tradução feita por alguém).
+
+Toque na que faz mais sentido. Ela fica salva **para aquele verso** (e para todas as vezes que ele se repete, inclusive nas frases salvas) e entra no backup. Escolher *Automática* de novo desfaz a troca.
+
+- O Google é chamado pelo endereço público do widget do Google Tradutor, **sem chave**. Não é uma API oficial: funciona hoje, mas pode parar sem aviso. Nesse caso o painel mostra "não disponível agora" e as outras opções continuam funcionando.
+- **Por que não DeepL:** o DeepL bloqueia chamadas feitas direto do navegador, e o app roda no GitHub Pages, sem servidor para intermediar.
 
 ### Busca de vídeos
 
@@ -235,7 +249,7 @@ node server.js
 
 **Dados no localStorage:**
 
-- `lg:lib`: músicas (letra LRC, sincronia, recorde, favorito), playlists, recentes, frases e estatísticas de progresso (`stats`: totais e atividade por dia).
+- `lg:lib`: músicas (letra LRC, sincronia, recorde, favorito), playlists, recentes, frases, traduções escolhidas por você (`trOverride`) e estatísticas de progresso (`stats`: totais e atividade por dia).
 - `lg:settings`: configurações.
 - `lg:tr`: cache de traduções.
 
@@ -253,5 +267,5 @@ node server.js
 
 ## Ideias futuras
 
-- **Traduções melhores:** DeepL (grátis até 500 mil caracteres/mês, com chave), tradução por IA (entende contexto e gírias e pode explicar expressões) ou colar uma tradução humana linha a linha.
+- **Traduções ainda melhores:** tradução por IA com chave (entende contexto e gírias e pode explicar expressões), ou DeepL através de um pequeno servidor intermediário.
 - Treinar só as frases salvas, como flashcards com áudio.

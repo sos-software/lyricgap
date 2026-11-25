@@ -106,7 +106,10 @@ function vid(id, meta) {
   if (meta) { if (meta.title) v.title = meta.title; if (meta.author) v.author = meta.author; }
   return v;
 }
-const trCache = store.get('lg:tr', {});
+const trCache = store.get('lg:tr', {});          // automatic translations (MyMemory), per device
+lib.trOverride = lib.trOverride || {};            // translations the user picked or wrote; part of the library/backup
+const trKey = (text, lang = settings.lang) => lang + '|' + text;
+const trOf = (text, lang) => lib.trOverride[trKey(text, lang)] || trCache[trKey(text, lang)] || null;
 
 const STOP = new Set(('the a an and or but of to in on at for is it its i you me my we he she they them his her our your be am are was were ' +
   'do did does so as if no not oh ooh ah uh yeah hey la na da o e de do um uma que en el los las y se mi tu te le les du un une et je il').split(' '));
@@ -778,15 +781,120 @@ function buildLines() {
   const dur = playerReady ? player.getDuration() : 0;
   for (let i = 0; i < E.length; i++) {
     if (!E[i].text) continue;
-    let end = i + 1 < E.length ? E[i + 1].t : (dur || E[i].t + 6);
-    end = Math.min(end, E[i].t + 10);
-    if (end - E[i].t < 0.6) end = E[i].t + 0.6;
     const tokens = tokenize(E[i].text);
     tokens.forEach(tk => { if (tk.word && tk.core.length >= 2) { const k = norm(tk.core); if (k && !seen.has(k)) seen.set(k, tk.core); } });
-    lines.push({ t: E[i].t, end, text: E[i].text, tokens, blanks: [], blankMap: {}, tr: trCache[settings.lang + '|' + E[i].text] || null });
+    // entry: the LRC entry this verse comes from, so its timing can be edited and saved later
+    lines.push({ entry: E[i], t: E[i].t, end: lineEnd(E, i, dur), text: E[i].text, tokens, blanks: [], blankMap: {}, tr: trOf(E[i].text) });
   }
   S.lines = lines; S.pool = [...seen.values()];
   return lines;
+}
+/* A verse ends where the next LRC entry starts. An empty entry is an explicit "verse ends here" marker
+   (from sync or from the verse timing editor) and is respected as is; otherwise the verse lasts at most 10s. */
+function lineEnd(E, i, dur) {
+  const t = E[i].t, next = E[i + 1];
+  let end = next ? next.t : (dur || t + 6);
+  if (!next || next.text) end = Math.min(end, t + 10);
+  return Math.max(end, t + 0.6);
+}
+function retimeLines() {
+  const E = S.entries, dur = playerReady ? player.getDuration() : 0;
+  S.lines.forEach(l => { const i = E.indexOf(l.entry); if (i >= 0) { l.t = E[i].t; l.end = lineEnd(E, i, dur); } });
+}
+
+/* ================= verse timing editor ================= */
+/* When the lyric is a bit off (the quiz stops before the verse is fully sung), the player fixes that verse:
+   listen, nudge or tap-mark the start/end, save. The fix is written into the song's LRC. */
+function verseBounds(line) {
+  const E = S.entries, i = E.indexOf(line.entry), dur = playerReady ? player.getDuration() : 0;
+  let p = i - 1; while (p >= 0 && !E[p].text) p--;
+  let j = i + 1; while (E[j] && !E[j].text) j++;
+  const after = E[j] && E[j + 1];                       // whatever follows the next verse
+  return {
+    minStart: p >= 0 ? E[p].t + 0.5 : 0,
+    // the end may push the next verse later, but never past what comes after it
+    maxEnd: after ? after.t - 0.5 : E[j] ? (dur || E[j].t + 30) - 0.3 : (dur || line.t + 30)
+  };
+}
+function sheetAdjustVerse(idx) {
+  const line = S.lines[idx]; if (!line || !line.entry) return;
+  const wasWaiting = S.waiting;
+  if (playerReady) player.pauseVideo();
+  S.waiting = false; setRing(0);
+  const b = verseBounds(line);
+  const A = S.adjust = { idx, line, start: line.t, end: line.end, mode: null, b, wasWaiting };
+  const clamp = () => {
+    A.start = Math.max(b.minStart, Math.min(A.start, A.end - 0.5));
+    A.end = Math.max(A.start + 0.5, Math.min(A.end, b.maxEnd));
+  };
+  const paint = () => {
+    $('#adjStart').textContent = fmt(Math.max(0, A.start));
+    $('#adjEnd').textContent = fmt(Math.max(0, A.end));
+    $('#adjDur').textContent = (A.end - A.start).toFixed(1) + 's';
+    const changed = Math.abs(A.start - line.t) > 0.01 || Math.abs(A.end - line.end) > 0.01;
+    $('#sheetContent [data-a=save]').disabled = !changed;
+    const lab = { preview: ['■ Parar', 'Marcar início', 'Marcar fim'], markStart: ['▶ Ouvir o verso', '● Começou agora!', 'Marcar fim'], markEnd: ['▶ Ouvir o verso', 'Marcar início', '● Terminou agora!'] }[A.mode] || ['▶ Ouvir o verso', 'Marcar início', 'Marcar fim'];
+    ['play', 'mstart', 'mend'].forEach((k, n) => { const el = $(`#sheetContent [data-a=${k}]`); el.textContent = lab[n]; el.classList.toggle('live', lab[n].startsWith('●')); });
+  };
+  A.paint = paint;
+  const step = (k, d) => () => { A.mode = null; player.pauseVideo(); A[k] += d; clamp(); paint(); };
+  const play = (from, mode) => { A.mode = mode; seekLyric(from); player.playVideo(); paint(); };
+  const close = save => {
+    if (save) applyVerseTiming(line, A.start, A.end);
+    S.adjust = null; closeSheet();
+    const l = S.lines[idx];
+    if (S.phase === 'karaoke') { markKarCur(); seekLyric(l.t - 0.8); player.playVideo(); return; }
+    // replay the verse with its (new) timing: in Pause mode it stops again at the end, now in the right place
+    S.hold = idx; S.cur = idx; seekLyric(l.t - 0.8); player.playVideo(); renderGame();
+    if (save) setStatus('⏱ Tempo do verso salvo', 'info');
+  };
+  openSheet(`<h3>Ajustar tempo do verso</h3>
+    <div class="adjline">${S.phase === 'play' ? lineHTML(line, false, false) : esc(line.text)}</div>
+    <p class="caption center-text" style="margin-top:4px">Verso ${idx + 1} de ${S.lines.length}. Deixe o verso tocar inteiro e terminar logo depois da última palavra.</p>
+    <div class="adjgrid">
+      <span>Começa</span><div class="stepper"><button data-a="s1">−</button><b id="adjStart"></b><button data-a="s2">+</button></div>
+      <span>Termina</span><div class="stepper"><button data-a="e1">−</button><b id="adjEnd"></b><button data-a="e2">+</button></div>
+    </div>
+    <p class="caption center-text" style="margin-top:2px">Cada toque em − / + move 0,25s · duração <b id="adjDur"></b></p>
+    <button class="btn tonal wide" data-a="play"></button>
+    <div class="sheetbtns" style="margin-top:8px"><button class="btn" data-a="mstart"></button><button class="btn" data-a="mend"></button></div>
+    <p class="caption" style="margin-top:8px"><b>Marcar:</b> toque e o trecho começa a tocar. Toque de novo no instante em que a voz começa (ou termina).</p>
+    <div class="sheetbtns"><button class="btn" data-a="cancel">Cancelar</button><button class="btn primary" data-a="save">Salvar este verso</button></div>
+    <div class="grouplabel">A música toda está fora?</div>
+    <div class="group"><div class="grow"><span>Sincronia geral<small>Use − se toda a letra aparece antes da voz</small></span><div class="stepper"><button data-a="offm">−</button><span id="offVal">${(S.offset >= 0 ? '+' : '') + S.offset.toFixed(1)}s</span><button data-a="offp">+</button></div></div></div>`, {
+    s1: step('start', -0.25), s2: step('start', 0.25), e1: step('end', -0.25), e2: step('end', 0.25),
+    play: () => { if (A.mode === 'preview') { A.mode = null; player.pauseVideo(); paint(); } else play(A.start - 0.4, 'preview'); },
+    mstart: () => {
+      if (A.mode === 'markStart') { A.start = lyricTime() - 0.15; A.mode = null; player.pauseVideo(); clamp(); paint(); }
+      else play(Math.max(b.minStart - 0.5, A.start - 3), 'markStart');
+    },
+    mend: () => {
+      if (A.mode === 'markEnd') { A.end = lyricTime(); A.mode = null; player.pauseVideo(); clamp(); paint(); }
+      else play(A.start - 0.4, 'markEnd');
+    },
+    offm: () => nudge(-0.2), offp: () => nudge(0.2),
+    cancel: () => close(false), save: () => close(true)
+  }, () => close(false));
+  paint();
+}
+/* runs instead of the game tick while the editor is open: stop the preview at the verse end */
+function adjustTick(L) {
+  const A = S.adjust;
+  if (A.mode === 'preview' && L >= A.end) { A.mode = null; player.pauseVideo(); A.paint(); }
+  if (A.mode === 'markEnd' && L > A.b.maxEnd) { A.mode = null; player.pauseVideo(); A.paint(); }
+}
+function applyVerseTiming(line, start, end) {
+  const E = S.entries, e = line.entry;
+  e.t = start;
+  for (let k = E.indexOf(e) - 1; k >= 0 && !E[k].text; k--) if (E[k].t > start) E[k].t = start;   // earlier end marker can't pass the new start
+  const i = E.indexOf(e);
+  let j = i + 1; while (E[j] && !E[j].text) E.splice(j, 1);      // old end markers of this verse
+  const nt = E[j];
+  if (nt && end >= nt.t - 0.05) nt.t = end;                       // the verse runs into the next one: the next one starts later
+  else E.splice(j, 0, { t: end, text: '' });                      // a pause before the next verse: mark where this one ends
+  E.sort((a, b) => a.t - b.t);
+  saveSong(); retimeLines();
+  toast('⏱ Tempo do verso salvo');
 }
 function buildGame() {
   const lines = buildLines();
@@ -831,6 +939,7 @@ async function startGame() {
 }
 function endPlay() {
   document.body.classList.remove('playing');
+  S.adjust = null;
   $('#skipIntro').classList.add('hidden');
   try { wakeLock && wakeLock.release(); } catch { } wakeLock = null;
 }
@@ -934,11 +1043,13 @@ let lastTick = Date.now();
 function tick() {
   const now = Date.now(), dt = now - lastTick; lastTick = now;
   if (!inSession() || !playerReady) return;
+  if (S.adjust) return adjustTick(lyricTime());
   if (dt < 1000 && player.getPlayerState() === YT.PlayerState.PLAYING) { S.msAcc = (S.msAcc || 0) + dt; if (S.msAcc > 10000) { stat('ms', S.msAcc); S.msAcc = 0; } }
   const st = player.getPlayerState();
   const L = lyricTime();
   updateSkipIntro(L);
   if (S.phase === 'karaoke') return tickKaraoke(L);
+  $('#gAdj').classList.toggle('hot', !!S.waiting);   // paused for an answer: when a cut verse gets noticed
   if (settings.pace === 'flow') return tickFlow(L);
   const cur = S.lines[S.cur];
   if (cur && hasUnsolved(cur) && st === YT.PlayerState.PLAYING && L >= cur.end - 0.15 && L < cur.end + 1.5) { pauseForAnswer(); return; }
@@ -1098,7 +1209,7 @@ function lineHTML(line, isCur, withTr) {
     else { const shown = b.answer.slice(0, b.hint); inner = `<span class="gap${b === act ? ' active' : ''}">${esc(shown)}${'_'.repeat(b.answer.length - shown.length)}</span>`; }
     return esc(tk.pre) + inner + esc(tk.post);
   }).join('');
-  if (withTr && settings.translate && settings.lang !== 'pt') h += `<div class="tr${isCur ? ' trcur' : ''}">${line.tr ? esc(line.tr) : isCur && !line.trFail ? '<span class="trwait">traduzindo…</span>' : ''}</div>`;
+  if (withTr && settings.translate && settings.lang !== 'pt') h += `<div class="tr${isCur ? ' trcur' : ''}">${line.tr ? esc(line.tr) + trFixBtn(`data-trfix="${S.lines.indexOf(line)}"`) : isCur && !line.trFail ? '<span class="trwait">traduzindo…</span>' : ''}</div>`;
   return h;
 }
 const DIRS = ['up', 'left', 'right', 'down'];
@@ -1112,6 +1223,7 @@ function renderGame() {
   const revisit = i >= 0 && i < S.maxCur && !hasUnsolved(L[i]);
   $('#lCur').innerHTML = i < 0 ? '<span class="muted">🎧 Prepare-se…</span>'
     : lineHTML(L[i], true, true) + (revisit ? ' ' + bmBtn(!!findPhrase(S.videoId, L[i].text), `data-bm="${i}" style="position:static;transform:none;display:inline-grid;vertical-align:middle"`) : '');
+  $('#gAdj').classList.toggle('hidden', i < 0);
   $('#gBack').disabled = S.cur <= 0 && S.backTarget == null;
   $('#gSkip').classList.toggle('hidden', settings.pace === 'flow');
   $('#hudOk').textContent = S.ok; $('#hudMiss').textContent = S.miss; $('#hudStreak').textContent = S.streak;
@@ -1131,7 +1243,8 @@ function renderGame() {
 }
 async function fetchTr(text) {
   if (settings.lang === 'pt') return null;
-  const key = settings.lang + '|' + text;
+  const key = trKey(text);
+  if (lib.trOverride[key]) return lib.trOverride[key];
   if (trCache[key]) return trCache[key];
   try {
     const r = await fetchT('https://api.mymemory.translated.net/get?' + new URLSearchParams({ q: text, langpair: settings.lang + '|pt-BR' }));
@@ -1148,6 +1261,71 @@ async function translateLine(line, force = false) {
   line.trBusy = false;
   if (tr) line.tr = tr; else line.trFail = true;
   if (S.phase === 'karaoke') paintKarLine(S.lines.indexOf(line)); else renderGame();
+}
+
+/* ================= better translation ================= */
+/* The automatic translation (MyMemory) is often literal. Next to every translation a ✎ button opens a panel to
+   compare it with Google Translate or write your own; the choice is saved for that verse (and every repeat of it). */
+const trFixBtn = attrs => `<button class="trfix" ${attrs} title="Melhorar tradução" aria-label="Melhorar tradução">${icon('edit')}</button>`;
+const gCache = new Map();
+async function fetchGoogle(text, lang) {
+  const k = lang + '|' + text;
+  if (gCache.has(k)) return gCache.get(k);
+  // the public endpoint of Google Translate's web widget: no key, answers browser requests (unofficial, may change)
+  const r = await fetchT('https://translate.googleapis.com/translate_a/single?' + new URLSearchParams({ client: 'gtx', sl: lang, tl: 'pt', dt: 't', q: text }), 8000);
+  const j = await r.json();
+  const tx = ((j && j[0]) || []).map(x => x[0]).join('').trim() || null;
+  if (tx) gCache.set(k, tx);
+  return tx;
+}
+function setTranslation(text, lang, tr, mine) {
+  const key = trKey(text, lang);
+  if (mine) lib.trOverride[key] = tr; else delete lib.trOverride[key];
+  if (lang === settings.lang) S.lines.forEach(l => { if (l.text === text) { l.tr = tr; l.trFail = false; } });
+  lib.phrases.forEach(p => { if (p.text === text && (p.lang || 'en') === lang) p.tr = tr; });
+  saveLib();
+}
+function sheetFixTr(text, lang, after) {
+  const key = trKey(text, lang), auto = trCache[key] || null, mine = lib.trOverride[key] || '';
+  const wasPlaying = inSession() && playerReady && player.getPlayerState() === YT.PlayerState.PLAYING;
+  if (wasPlaying) player.pauseVideo();
+  const cur = mine || auto;
+  let google = null;
+  const done = msg => { closeSheet(); if (msg) toast(msg); if (wasPlaying) player.playVideo(); if (after) after(); };
+  const choice = (k, label, tx, placeholder) => `<button class="tropt${tx && tx === cur ? ' on' : ''}" data-a="pick" data-k="${k}" ${tx ? '' : 'disabled'}>
+      <small>${label}${tx && tx === cur ? ' · em uso' : ''}</small><span id="tro-${k}">${tx ? esc(tx) : placeholder}</span></button>`;
+  openSheet(`<h3>Tradução do verso</h3>
+    <div class="adjline">${S.phase === 'play' && S.lines.some(l => l.text === text && hasUnsolved(l)) ? lineHTML(S.lines.find(l => l.text === text), false, false) : esc(text)}</div>
+    <p class="caption center-text" style="margin-top:4px">Toque na tradução que faz mais sentido. Ela fica salva para este verso.</p>
+    ${choice('auto', 'Automática (MyMemory)', auto, 'sem tradução')}
+    ${choice('google', 'Google Tradutor', null, '<span class="trwait">buscando…</span>')}
+    <div class="tropt mine${mine && mine === cur ? ' on' : ''}"><small>Minha tradução${mine ? ' · em uso' : ''}</small>
+      <textarea id="trMine" rows="2" placeholder="Escreva com suas palavras…">${esc(mine)}</textarea>
+      <button class="btn primary wide" data-a="mine" style="margin-top:8px">Usar a minha</button></div>
+    <button class="btn wide" data-a="cancel">Cancelar</button>`, {
+    pick: (e, el) => {
+      const k = el.dataset.k, tx = k === 'auto' ? auto : google;
+      if (!tx) return;
+      if (tx === cur && !(k === 'auto' && mine)) return done();
+      setTranslation(text, lang, tx, k !== 'auto');
+      done(k === 'auto' ? 'Voltou para a tradução automática' : '✎ Tradução do Google salva');
+    },
+    mine: () => {
+      const tx = $('#trMine').value.trim().replace(/\s+/g, ' ');
+      if (!tx) { $('#trMine').focus(); return; }
+      setTranslation(text, lang, tx, true);
+      done('✎ Sua tradução foi salva');
+    },
+    cancel: () => done()
+  }, () => { if (wasPlaying) player.playVideo(); if (after) after(); });
+  fetchGoogle(text, lang).then(tx => {
+    google = tx;
+    const el = $('#tro-google'); if (!el) return;
+    const btn = el.closest('.tropt');
+    if (!tx) { el.textContent = 'não disponível agora'; return; }
+    el.textContent = tx; btn.disabled = false;
+    if (tx === cur) { btn.classList.add('on'); btn.querySelector('small').textContent = 'Google Tradutor · em uso'; }
+  }).catch(() => { const el = $('#tro-google'); if (el) el.textContent = 'não disponível agora'; });
 }
 
 /* ================= saved phrases ================= */
@@ -1171,7 +1349,7 @@ let clipPlayer = null;
 function sheetClip(p) {
   if (playerReady) player.pauseVideo();
   const link = `https://youtu.be/${p.videoId}?t=${Math.floor(p.start)}`;
-  openSheet(`<div class="cliptext">${esc(p.text)}</div>${p.tr ? `<div class="tr">${esc(p.tr)}</div>` : ''}
+  openSheet(`<div class="cliptext">${esc(p.text)}</div><div class="tr">${p.tr ? esc(p.tr) : ''}${trFixBtn('data-a="trfix"')}</div>
     <div class="clipwrap"><div id="clipPlayer"></div></div>
     <p class="muted" style="text-align:center;margin:0 0 6px">${esc(p.title || '')} · ${fmtDur(p.start) || '0:00'}</p>
     <div class="actions" style="margin-top:6px">
@@ -1181,6 +1359,7 @@ function sheetClip(p) {
       <button class="ctrl" data-a="del">${icon('trash')}<span>Remover</span></button>
     </div>`, {
     again: () => clipPlayer && clipPlayer.loadVideoById({ videoId: p.videoId, startSeconds: p.start, endSeconds: p.end }),
+    trfix: () => { closeSheet(); sheetFixTr(p.text, p.lang || 'en', () => { sheetClip(p); if (document.body.dataset.view === 'home') renderHome(); }); },
     song: () => { closeSheet(); openSong(p.videoId, { title: p.title, author: p.author }); },
     del: () => { lib.phrases = lib.phrases.filter(x => x !== p); saveLib(); closeSheet(); renderHome(); toast('Frase removida'); }
   });
@@ -1258,13 +1437,13 @@ function renderKaraoke() {
   $('#kTr').textContent = KAR_TR[mode];
   $('#kTr').disabled = settings.lang === 'pt';
   box.innerHTML = '<div class="kpad"></div>' + S.lines.map((l, i) => `<div class="kline" data-i="${i}">
-      <div class="ko">${esc(l.text)}</div><div class="kt"></div>${bmBtn(!!findPhrase(S.videoId, l.text), `data-kbm="${i}"`)}</div>`).join('') + '<div class="kpad"></div>';
+      <div class="ko">${esc(l.text)}</div><div class="kt"></div><button class="iconbtn sm kadj" data-kadj="${i}" title="Ajustar tempo do verso">${icon('sync')}</button>${bmBtn(!!findPhrase(S.videoId, l.text), `data-kbm="${i}"`)}</div>`).join('') + '<div class="kpad"></div>';
   S.lines.forEach((_, i) => paintKarLine(i));
   markKarCur(true);
 }
 function paintKarLine(i) {
   const l = S.lines[i], row = $(`#kList .kline[data-i="${i}"]`); if (!l || !row) return;
-  row.querySelector('.kt').innerHTML = l.tr ? esc(l.tr) : (l.trFail ? '' : '<span class="trwait">…</span>');
+  row.querySelector('.kt').innerHTML = l.tr ? esc(l.tr) + trFixBtn(`data-ktr="${i}"`) : (l.trFail ? '' : '<span class="trwait">…</span>');
 }
 async function translateAllKaraoke() {
   if (settings.lang === 'pt' || settings.karTr === 'off') return;
@@ -1443,6 +1622,7 @@ function importLib(data) {
     if (!cur) lib.playlists.push(p); else p.items.forEach(i => { if (!cur.items.includes(i)) cur.items.push(i); });
   });
   lib.recent = [...new Set([...lib.recent, ...(data.recent || [])])].slice(0, 50);
+  Object.entries(data.trOverride || {}).forEach(([k, v]) => { if (!lib.trOverride[k]) lib.trOverride[k] = v; });
   (data.phrases || []).forEach(p => { if (!lib.phrases.some(x => x.id === p.id || (x.videoId === p.videoId && x.text === p.text))) lib.phrases.push(p); });
   saveLib();
 }
@@ -1504,7 +1684,11 @@ $('#playBtn').onclick = startGame;
 [['#rdPace', 'pace'], ['#rdMode', 'mode'], ['#rdDiff', 'difficulty']].forEach(([sel, key]) =>
   $$(sel + ' button').forEach(b => b.onclick = () => applySetting(key, b.dataset.v)));
 
-['#lPrev', '#lCur'].forEach(sel => $(sel).addEventListener('click', e => { const b = e.target.closest('[data-bm]'); if (b) toggleSavePhrase(S.lines[+b.dataset.bm]); }));
+['#lPrev', '#lCur'].forEach(sel => $(sel).addEventListener('click', e => {
+  const t = e.target.closest('[data-trfix]');
+  if (t) { const l = S.lines[+t.dataset.trfix]; if (l) sheetFixTr(l.text, settings.lang, renderGame); return; }
+  const b = e.target.closest('[data-bm]'); if (b) toggleSavePhrase(S.lines[+b.dataset.bm]);
+}));
 $('#gBack').onclick = goBackVerse;
 $('#answerForm').onsubmit = e => { e.preventDefault(); submitAnswer($('#answer').value); };
 $$('#pad .opt').forEach(btn => btn.onclick = () => { if (btn.textContent && Date.now() >= padFreezeUntil) submitAnswer(btn.textContent); });
@@ -1518,6 +1702,7 @@ $('#gSpeed').onclick = cycleSpeed;
 $('#gQuit').onclick = confirmQuit;
 $('#gSet').onclick = sheetSettings;
 $('#skipIntro').onclick = skipToLyrics;
+$('#gAdj').onclick = () => sheetAdjustVerse(S.cur);
 
 $('#karBtn').onclick = startKaraoke;
 $('#kQuit').onclick = confirmQuit;
@@ -1531,6 +1716,10 @@ $('#kTr').onclick = () => {
   renderKaraoke(); translateAllKaraoke();
 };
 $('#kList').addEventListener('click', async e => {
+  const ktr = e.target.closest('[data-ktr]');
+  if (ktr) { sheetFixTr(S.lines[+ktr.dataset.ktr].text, settings.lang, () => S.lines.forEach((_, i) => paintKarLine(i))); return; }
+  const adj = e.target.closest('[data-kadj]');
+  if (adj) { sheetAdjustVerse(+adj.dataset.kadj); return; }
   const bm = e.target.closest('[data-kbm]');
   if (bm) { const on = await toggleSavePhrase(S.lines[+bm.dataset.kbm]); bm.classList.toggle('on', on); bm.innerHTML = icon(on ? 'bm-f' : 'bm'); return; }
   const row = e.target.closest('.kline'); if (row) karaokeSeek(+row.dataset.i);

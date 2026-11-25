@@ -425,3 +425,32 @@ body.playing #song{padding-top:var(--st)}
 @keyframes pickbad{15%,55%{transform:translateX(-7px)}35%,75%{transform:translateX(7px)}}
 #answer.shake{animation:pickbad .45s;border-color:var(--bad)}
 .intro{margin:4px 2px 12px;font-size:14.5px;line-height:1.5;color:var(--text2)} .intro b{color:var(--text)}
+
+/* verse timing editor */
+.adjwrap{text-align:center;margin-top:6px;min-height:30px}
+.adjbtn{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-size:12.5px;font-weight:600;color:var(--muted);background:transparent;border:1px solid var(--line);transition:all .2s}
+.adjbtn svg{width:15px;height:15px}
+.adjbtn.hot{color:var(--warn);border-color:rgba(251,191,36,.4);background:rgba(251,191,36,.08)}
+.adjline{text-align:center;font-size:18px;font-weight:700;line-height:1.4;margin:0 6px}
+.adjgrid{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px 14px;background:var(--s2);border-radius:16px;padding:12px 14px;margin-top:12px}
+.adjgrid > span{font-size:14px;font-weight:600;color:var(--text2)}
+.adjgrid .stepper{justify-content:flex-end}
+.adjgrid .stepper b{min-width:86px;text-align:center;font-variant-numeric:tabular-nums;font-size:16px}
+.btn.live{background:rgba(244,63,94,.18);color:#fb7185;animation:pulse2 1s infinite}
+@keyframes pulse2{50%{opacity:.65}}
+.kline{padding-right:78px}
+.kline .kadj{position:absolute;right:40px;top:50%;transform:translateY(-50%);color:var(--muted);opacity:0;transition:opacity .2s}
+.kline.on .kadj,.kline:hover .kadj{opacity:1}
+
+/* better translation */
+.trfix{display:inline-grid;place-items:center;width:28px;height:28px;margin:-4px 0 -4px 4px;vertical-align:middle;border-radius:50%;color:var(--muted);font-style:normal;opacity:.8}
+.trfix svg{width:14px;height:14px}
+.trfix:hover,.trfix:active{background:var(--s2);color:var(--text);opacity:1}
+.tropt{display:block;width:100%;text-align:left;background:var(--s2);border:1.5px solid transparent;border-radius:14px;padding:11px 13px;margin-top:8px}
+.tropt:disabled{opacity:.6;pointer-events:none}
+.tropt.on{border-color:var(--a1);background:rgba(139,92,246,.12)}
+.tropt small{display:block;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.tropt.on small{color:#c4b5fd}
+.tropt > span{display:block;font-size:15.5px;line-height:1.4}
+.tropt textarea{margin-top:2px;background:var(--s1);font-size:15.5px}
+.tropt .btn.wide{margin-top:8px}
