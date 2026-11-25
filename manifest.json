@@ -1,6 +1,6 @@
 {
-  "name": "LyricGap",
-  "short_name": "LyricGap",
+  "name": "sosLyricGap",
+  "short_name": "sosLyricGap",
   "description": "Aprenda idiomas completando letras de músicas do YouTube",
   "start_url": "./",
   "scope": "./",

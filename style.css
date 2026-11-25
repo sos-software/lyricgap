@@ -1,4 +1,4 @@
-/* ============ LyricGap — design tokens ============ */
+/* ============ sosLyricGap — design tokens ============ */
 :root{
   --bg:#09090f; --s1:#13131c; --s2:#1b1b27; --s3:#262634; --line:rgba(255,255,255,.07);
   --text:#f4f4f8; --text2:#b9b9c9; --muted:#7c7c93;
@@ -64,7 +64,8 @@ textarea{resize:vertical;margin-top:10px;line-height:1.45}
 .apphead h1{flex:1;margin:0;font-size:30px;font-weight:800;letter-spacing:-.6px}
 .logo{flex:1;display:flex;align-items:center;gap:10px;font-size:22px;font-weight:800;letter-spacing:-.5px}
 .logo .mark{width:32px;height:32px;border-radius:10px;background:var(--grad);display:grid;place-items:center;font-size:17px;color:#fff}
-.logo .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;margin-left:-10px}
+.logo .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo .sos{font-weight:600;color:var(--muted);margin-right:1px}
 .songhead{display:flex;align-items:center;gap:2px;height:56px;padding:0 6px}
 .ttl{flex:1;min-width:0;display:flex;flex-direction:column;padding:0 4px;text-align:center}
 .ttl b{font-size:15px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

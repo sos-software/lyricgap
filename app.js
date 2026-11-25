@@ -1,5 +1,5 @@
 'use strict';
-/* LyricGap — complete song lyrics while the YouTube video plays. */
+/* sosLyricGap (Sóstenes Rondena) — complete song lyrics while the YouTube video plays. */
 
 /* ================= utils ================= */
 const $ = s => document.querySelector(s);
@@ -1547,7 +1547,7 @@ function sheetSettings() {
     <textarea id="ioBox" rows="4" class="hidden" placeholder="Cole aqui o backup e toque em Restaurar backup"></textarea>
 
     <button class="btn primary wide" data-a="done">Concluído</button>
-    <p class="caption center-text">LyricGap · letras de LRCLIB · tradução por MyMemory</p>`, {
+    <p class="caption center-text">sosLyricGap · por Sóstenes Rondena<br>letras de LRCLIB · tradução por MyMemory e Google</p>`, {
     offm: () => nudge(-0.2), offp: () => nudge(0.2),
     export: async () => {
       const txt = JSON.stringify(lib); const box = $('#ioBox'); box.classList.remove('hidden'); box.value = txt; box.select();

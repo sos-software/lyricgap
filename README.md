@@ -1,4 +1,6 @@
-# LyricGap 🎵
+# sosLyricGap 🎵
+
+Por **Sóstenes Rondena**.
 
 Jogo para aprender idiomas completando a letra de músicas do YouTube. A música toca, a frase aparece com uma lacuna e você completa a palavra que falta.
 
@@ -187,7 +189,7 @@ Toque na que faz mais sentido. Ela fica salva **para aquele verso** (e para toda
 
 1. Abra **https://sos-software.github.io/lyricgap/** no **Safari**.
 2. Toque em **Compartilhar** (⬆) e depois **Adicionar à Tela de Início**.
-3. Abra pelo ícone **LyricGap**. O app abre em tela cheia, sem a barra do Safari.
+3. Abra pelo ícone **sosLyricGap**. O app abre em tela cheia, sem a barra do Safari.
 
 Durante o jogo a tela não apaga (iOS 16.4 ou mais novo).
 
