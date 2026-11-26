@@ -24,7 +24,7 @@ const icon = (name, cls = '') => `<svg class="${cls}"><use href="#i-${name}"/></
 
 /* ================= settings & library ================= */
 const settings = Object.assign(
-  { pace: 'pause', difficulty: 'medio', mode: 'choice', speed: 1, translate: true, lang: 'en', autoReplay: 8, sounds: true, ytKey: '', pipedOk: '', goal: 20, musicOnly: true, karTr: 'side' },
+  { pace: 'pause', difficulty: 'medio', mode: 'choice', speed: 1, translate: true, lang: 'en', autoReplay: 8, sounds: true, ytKey: '', pipedOk: '', goal: 20, musicOnly: true, karTr: 'side', claudeKey: '', aiModel: 'claude-haiku-5-5' },
   store.get('lg:settings', {})
 );
 const saveSettings = () => store.set('lg:settings', settings);
@@ -1245,7 +1245,7 @@ function lineHTML(line, isCur, withTr) {
     else { const shown = b.answer.slice(0, b.hint); inner = `<span class="gap${b === act ? ' active' : ''}">${esc(shown)}${'_'.repeat(b.answer.length - shown.length)}</span>`; }
     return esc(tk.pre) + inner + esc(tk.post);
   }).join('');
-  if (withTr && settings.translate && settings.lang !== 'pt') h += `<div class="tr${isCur ? ' trcur' : ''}">${line.tr ? esc(line.tr) + trFixBtn(`data-trfix="${S.lines.indexOf(line)}"`) : isCur && !line.trFail ? '<span class="trwait">traduzindo…</span>' : ''}</div>`;
+  if (withTr && settings.translate && settings.lang !== 'pt') h += `<div class="tr${isCur ? ' trcur' : ''}">${line.tr ? esc(line.tr) + `<span class="trbtns">${trFixBtn(`data-trfix="${S.lines.indexOf(line)}"`)}${trAiBtn(`data-trai="${S.lines.indexOf(line)}"`)}</span>` : isCur && !line.trFail ? '<span class="trwait">traduzindo…</span>' : ''}</div>`;
   return h;
 }
 const DIRS = ['up', 'left', 'right', 'down'];
@@ -1321,6 +1321,176 @@ function setTranslation(text, lang, tr, mine) {
   lib.phrases.forEach(p => { if (p.text === text && (p.lang || 'en') === lang) p.tr = tr; });
   saveLib();
 }
+/* ================= AI (Claude) ================= */
+/* Optional. The user pastes their own Anthropic API key in Settings; it stays in this device's localStorage
+   (never in the code, the repo or the library backup) and requests go straight from the browser to Anthropic.
+   Official TypeScript SDK, loaded from the CDN on first use (pinned version). */
+const SDK_URL = 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@1.8.0/+esm';
+const AI_MODELS = [['claude-haiku-5-5', 'Haiku 5.5 · rápido e barato'], ['claude-sonnet-5-5', 'Sonnet 5.5 · mais caprichado']];
+let AnthropicSDK = null, aiClient = null, aiClientKey = '';
+lib.aiNotes = lib.aiNotes || {};   // verse key -> short note about slang/idioms from the AI translation
+async function getAI() {
+  if (!settings.claudeKey) { const e = new Error('Sem chave'); e.code = 'nokey'; throw e; }
+  if (!AnthropicSDK) { const mod = await import(SDK_URL); AnthropicSDK = mod.default || mod.Anthropic; }
+  if (!aiClient || aiClientKey !== settings.claudeKey) {
+    aiClient = new AnthropicSDK({ apiKey: settings.claudeKey, dangerouslyAllowBrowser: true });
+    aiClientKey = settings.claudeKey;
+  }
+  return aiClient;
+}
+function aiErrorText(e) {
+  const A = AnthropicSDK;
+  if (e && e.code === 'nokey') return 'Coloque sua chave da Claude em ⚙ Configurações → Inteligência artificial.';
+  if (e && e.code === 'refusal') return 'A IA não quis responder este pedido.';
+  if (A) {   // most specific first; APIConnectionError is a subclass of APIError in the TS SDK
+    if (e instanceof A.AuthenticationError) return 'Chave inválida. Confira a chave em ⚙ Configurações.';
+    if (e instanceof A.PermissionDeniedError) return 'Essa chave não tem permissão para usar este modelo.';
+    if (e instanceof A.NotFoundError) return 'Modelo não disponível para esta chave. Troque o modelo em ⚙ Configurações.';
+    if (e instanceof A.RateLimitError) return 'Limite de uso da chave atingido. Espere um pouco e tente de novo.';
+    if (e instanceof A.APIConnectionError) return 'Sem conexão com a Anthropic. Verifique a internet.';
+    if (e instanceof A.APIError) return `Erro da API da Claude (${e.status || '?'}). Tente de novo.`;
+  }
+  return 'Não foi possível usar a IA agora (' + (e && e.message || 'erro') + ').';
+}
+const LANG_NAME = { en: 'inglês', es: 'espanhol', fr: 'francês', it: 'italiano', de: 'alemão', pt: 'português' };
+const songContext = () => {
+  const lines = S.entries.filter(e => e.text).map(e => e.text);
+  return `Música: "${(S.v && S.v.title) || ''}"${S.v && S.v.author ? ' — ' + S.v.author : ''}\nLetra completa (para contexto):\n${lines.join('\n')}`;
+};
+const textOf = msg => msg.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
+
+const AI_TR_SYSTEM = `Você ajuda brasileiros a aprender idiomas com músicas. Traduza para o português do Brasil o verso pedido, de forma natural e fiel ao sentido na música (não palavra por palavra): gírias, expressões idiomáticas, duplo sentido e referências culturais devem virar o equivalente que um brasileiro entenderia.
+Responda exatamente neste formato, sem nada antes ou depois:
+TRADUÇÃO: <a tradução do verso, em uma linha>
+NOTA: <uma ou duas frases curtas explicando gíria, expressão ou referência do verso que ajudem a entender; escreva - se não houver nada a explicar>`;
+async function aiTranslateVerse(text) {
+  const ai = await getAI();
+  const msg = await ai.messages.create({
+    model: settings.aiModel,
+    max_tokens: 1024,
+    output_config: { effort: 'low' },   // short, well-defined task
+    system: AI_TR_SYSTEM,
+    messages: [{ role: 'user', content: `${S.entries.length ? songContext() + '\n\n' : ''}Verso para traduzir:\n${text}` }]
+  });
+  if (msg.stop_reason === 'refusal') { const e = new Error('refusal'); e.code = 'refusal'; throw e; }
+  const out = textOf(msg);
+  const tr = (out.match(/TRADU[ÇC][ÃA]O:\s*(.+)/i) || [])[1] || out.split('\n')[0];
+  let note = ((out.match(/NOTA:\s*([\s\S]+)/i) || [])[1] || '').trim();
+  if (/^[-–—]?$/.test(note)) note = '';
+  return { tr: tr.trim().replace(/^["“]|["”]$/g, ''), note };
+}
+
+/* ✨ button next to every translation: translate this verse with Claude, save it, show the note */
+const trAiBtn = attrs => `<button class="trai" ${attrs} title="Traduzir com IA" aria-label="Traduzir com IA">✨</button>`;
+function sheetNoKey(after) {
+  openSheet(`<h3>✨ Tradução com IA</h3>
+    <p class="caption center-text" style="margin-top:0">Para usar a IA, cole aqui a sua chave da API da Claude (Anthropic). Ela fica salva só neste aparelho.</p>
+    <input id="aiKeyQuick" type="password" placeholder="sk-ant-…" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button class="btn primary wide" data-a="save">Salvar e continuar</button>
+    <button class="btn wide" data-a="cancel">Agora não</button>`, {
+    save: () => { const k = $('#aiKeyQuick').value.trim(); if (!k) { $('#aiKeyQuick').focus(); return; } settings.claudeKey = k; saveSettings(); closeSheet(); if (after) after(); },
+    cancel: closeSheet
+  });
+  setTimeout(() => $('#aiKeyQuick') && $('#aiKeyQuick').focus(), 100);
+}
+function sheetAiTr(text, lang, after) {
+  if (!settings.claudeKey) return sheetNoKey(() => sheetAiTr(text, lang, after));
+  const key = trKey(text, lang), before = lib.trOverride[key] || null;
+  const wasPlaying = inSession() && playerReady && player.getPlayerState() === YT.PlayerState.PLAYING;
+  if (wasPlaying) player.pauseVideo();
+  const finish = () => { closeSheet(); if (wasPlaying) player.playVideo(); if (after) after(); };
+  openSheet(`<h3>✨ Tradução com IA</h3>
+    <div class="adjline">${esc(text)}</div>
+    <div id="aiTrBox" class="aibox"><span class="trwait">A IA está traduzindo este verso…</span></div>
+    <div class="sheetbtns"><button class="btn" data-a="undo" id="aiUndo" disabled>Desfazer</button><button class="btn primary" data-a="ok">OK</button></div>`, {
+    ok: finish,
+    undo: () => { if (before) setTranslation(text, lang, before, true); else setTranslation(text, lang, trCache[key] || null, false); delete lib.aiNotes[key]; saveLib(); toast('Tradução anterior de volta'); finish(); }
+  }, () => { if (wasPlaying) player.playVideo(); if (after) after(); });
+  aiTranslateVerse(text).then(({ tr, note }) => {
+    const box = $('#aiTrBox'); if (!box) return;
+    setTranslation(text, lang, tr, true);
+    if (note) lib.aiNotes[key] = note; else delete lib.aiNotes[key];
+    saveLib();
+    box.innerHTML = `<div class="aitr">${esc(tr)}</div>${note ? `<div class="ainote"><b>Entenda:</b> ${esc(note)}</div>` : ''}<small class="aisaved">Salva para este verso</small>`;
+    $('#aiUndo').disabled = false;
+  }).catch(e => {
+    const box = $('#aiTrBox'); if (!box) return;
+    box.innerHTML = `<div class="ainote err">${esc(aiErrorText(e))}</div>${e && e.code === 'nokey' ? '' : ''}`;
+  });
+}
+
+/* "✨ Entender a música": a full explanation in Portuguese, streamed as it is written and kept with the song */
+const AI_EXPLAIN_SYSTEM = `Você explica músicas para brasileiros que estão aprendendo o idioma da letra. Escreva em português do Brasil, em tom amigável, para quem quer entender a música de verdade. Use exatamente estas seções, com títulos começando por "## ":
+## Resumo
+(2 a 3 frases: do que a música fala)
+## A história e o sentido
+(o que acontece ou o que o eu lírico sente, parte por parte)
+## Expressões e gírias
+(lista com "- " : cada item com a expressão original curta em **negrito**, o significado e como diríamos em português)
+## Contexto
+(sobre o artista, a época, o estilo ou referências culturais que ajudam a entender; diga só o que tiver segurança)
+## Para praticar
+(3 palavras ou expressões úteis da música para guardar, com exemplo de uso)
+Cite só trechos curtos da letra, nunca a letra inteira. Seja direto: no máximo umas 450 palavras.`;
+function mdLite(src) {
+  const out = []; let inList = false;
+  esc(src).split('\n').forEach(raw => {
+    const l = raw.trim();
+    const inline = s => s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*(?!\s)(.+?)\*(?!\*)/g, '$1<i>$2</i>');
+    if (/^[-•]\s+/.test(l)) { if (!inList) { out.push('<ul>'); inList = true; } out.push('<li>' + inline(l.replace(/^[-•]\s+/, '')) + '</li>'); return; }
+    if (inList) { out.push('</ul>'); inList = false; }
+    if (/^#{1,4}\s+/.test(l)) out.push('<h4>' + inline(l.replace(/^#+\s+/, '')) + '</h4>');
+    else if (l) out.push('<p>' + inline(l) + '</p>');
+  });
+  if (inList) out.push('</ul>');
+  return out.join('');
+}
+let explainRun = 0;
+function sheetExplain(force = false) {
+  const v = S.v; if (!v) return;
+  if (!S.entries.length) { toast('Carregue a letra da música primeiro'); return; }
+  if (!settings.claudeKey) return sheetNoKey(() => sheetExplain(force));
+  const wasPlaying = inSession() && playerReady && player.getPlayerState() === YT.PlayerState.PLAYING;
+  if (wasPlaying) player.pauseVideo();
+  const cached = !force && v.explain;
+  openSheet(`<h3>✨ Entender a música</h3>
+    <p class="caption center-text" style="margin-top:0">${esc(v.title || '')}${v.author ? ' · ' + esc(v.author) : ''}</p>
+    <div id="explainBox" class="explain">${cached ? mdLite(v.explain) : '<span class="trwait">A IA está lendo a letra…</span>'}</div>
+    <div class="sheetbtns"><button class="btn" data-a="again" id="exAgain" ${cached ? '' : 'disabled'}>Gerar de novo</button><button class="btn primary" data-a="ok">Fechar</button></div>
+    <p class="caption center-text">Gerado por IA (${esc((AI_MODELS.find(m => m[0] === settings.aiModel) || [settings.aiModel])[0])}). Pode conter erros.</p>`, {
+    ok: () => { explainRun++; closeSheet(); if (wasPlaying) player.playVideo(); },
+    again: () => { explainRun++; sheetExplain(true); }
+  }, () => { explainRun++; if (wasPlaying) player.playVideo(); });
+  if (cached) return;
+  const run = ++explainRun;
+  (async () => {
+    const ai = await getAI();
+    const stream = ai.messages.stream({
+      model: settings.aiModel,
+      max_tokens: 8000,
+      system: AI_EXPLAIN_SYSTEM,
+      messages: [{ role: 'user', content: songContext() + '\n\nExplique esta música.' }]
+    });
+    let acc = '';
+    for await (const ev of stream) {
+      if (run !== explainRun) { stream.abort(); return; }   // sheet closed or regenerated
+      if (ev.type === 'content_block_delta' && ev.delta.type === 'text_delta') {
+        acc += ev.delta.text;
+        const box = $('#explainBox'); if (box) box.innerHTML = mdLite(acc);
+      }
+    }
+    const final = await stream.finalMessage();
+    if (final.stop_reason === 'refusal') { const e = new Error('refusal'); e.code = 'refusal'; throw e; }
+    if (run !== explainRun) return;
+    v.explain = acc.trim(); saveLib();
+    const again = $('#exAgain'); if (again) again.disabled = false;
+  })().catch(e => {
+    if (run !== explainRun || (e && e.name === 'AbortError')) return;
+    const box = $('#explainBox'); if (box) box.innerHTML = `<div class="ainote err">${esc(aiErrorText(e))}</div>`;
+    const again = $('#exAgain'); if (again) again.disabled = false;
+  });
+}
+
 function sheetFixTr(text, lang, after) {
   const key = trKey(text, lang), auto = trCache[key] || null, mine = lib.trOverride[key] || '';
   const wasPlaying = inSession() && playerReady && player.getPlayerState() === YT.PlayerState.PLAYING;
@@ -1335,6 +1505,7 @@ function sheetFixTr(text, lang, after) {
     <p class="caption center-text" style="margin-top:4px">Toque na tradução que faz mais sentido. Ela fica salva para este verso.</p>
     ${choice('auto', 'Automática (MyMemory)', auto, 'sem tradução')}
     ${choice('google', 'Google Tradutor', null, '<span class="trwait">buscando…</span>')}
+    <button class="tropt aiopt" data-a="ai"><small>✨ Inteligência artificial (Claude)</small><span>Traduzir com o contexto da música e explicar gírias</span></button>
     <div class="tropt mine${mine && mine === cur ? ' on' : ''}"><small>Minha tradução${mine ? ' · em uso' : ''}</small>
       <textarea id="trMine" rows="2" placeholder="Escreva com suas palavras…">${esc(mine)}</textarea>
       <button class="btn primary wide" data-a="mine" style="margin-top:8px">Usar a minha</button></div>
@@ -1352,7 +1523,8 @@ function sheetFixTr(text, lang, after) {
       setTranslation(text, lang, tx, true);
       done('✎ Sua tradução foi salva');
     },
-    cancel: () => done()
+    cancel: () => done(),
+    ai: () => { closeSheet(); sheetAiTr(text, lang, () => { if (wasPlaying) player.playVideo(); if (after) after(); }); }
   }, () => { if (wasPlaying) player.playVideo(); if (after) after(); });
   fetchGoogle(text, lang).then(tx => {
     google = tx;
@@ -1385,7 +1557,7 @@ let clipPlayer = null;
 function sheetClip(p) {
   if (playerReady) player.pauseVideo();
   const link = `https://youtu.be/${p.videoId}?t=${Math.floor(p.start)}`;
-  openSheet(`<div class="cliptext">${esc(p.text)}</div><div class="tr">${p.tr ? esc(p.tr) : ''}${trFixBtn('data-a="trfix"')}</div>
+  openSheet(`<div class="cliptext">${esc(p.text)}</div><div class="tr">${p.tr ? esc(p.tr) : ''}<span class="trbtns">${trFixBtn('data-a="trfix"')}${trAiBtn('data-a="trai"')}</span></div>
     <div class="clipwrap"><div id="clipPlayer"></div></div>
     <p class="muted" style="text-align:center;margin:0 0 6px">${esc(p.title || '')} · ${fmtDur(p.start) || '0:00'}</p>
     <div class="actions" style="margin-top:6px">
@@ -1396,6 +1568,7 @@ function sheetClip(p) {
     </div>`, {
     again: () => clipPlayer && clipPlayer.loadVideoById({ videoId: p.videoId, startSeconds: p.start, endSeconds: p.end }),
     trfix: () => { closeSheet(); sheetFixTr(p.text, p.lang || 'en', () => { sheetClip(p); if (document.body.dataset.view === 'home') renderHome(); }); },
+    trai: () => { closeSheet(); sheetAiTr(p.text, p.lang || 'en', () => { sheetClip(p); if (document.body.dataset.view === 'home') renderHome(); }); },
     song: () => { closeSheet(); openSong(p.videoId, { title: p.title, author: p.author }); },
     del: () => { lib.phrases = lib.phrases.filter(x => x !== p); saveLib(); closeSheet(); renderHome(); toast('Frase removida'); }
   });
@@ -1479,7 +1652,7 @@ function renderKaraoke() {
 }
 function paintKarLine(i) {
   const l = S.lines[i], row = $(`#kList .kline[data-i="${i}"]`); if (!l || !row) return;
-  row.querySelector('.kt').innerHTML = l.tr ? esc(l.tr) + trFixBtn(`data-ktr="${i}"`) : (l.trFail ? '' : '<span class="trwait">…</span>');
+  row.querySelector('.kt').innerHTML = l.tr ? esc(l.tr) + `<span class="trbtns">${trFixBtn(`data-ktr="${i}"`)}${trAiBtn(`data-kai="${i}"`)}</span>` : (l.trFail ? '' : '<span class="trwait">…</span>');
 }
 async function translateAllKaraoke() {
   if (settings.lang === 'pt' || settings.karTr === 'off') return;
@@ -1571,6 +1744,11 @@ function sheetSettings() {
       ${swRow('Sons de acerto', 'sounds')}
     </div>
 
+    <div class="grouplabel">Inteligência artificial (Claude)</div>
+    <input id="claudeKey" type="password" placeholder="Chave da API da Claude (sk-ant-…)" value="${esc(settings.claudeKey)}" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="field"><label>Modelo</label>${seg('aiModel', AI_MODELS, settings.aiModel)}</div>
+    <p class="caption" style="margin-top:6px">Usada no ✨ ao lado das traduções e em <b>Entender a música</b>. A chave fica só neste aparelho (não vai no backup) e é enviada direto para a Anthropic. Dica: defina um limite de gastos para a chave no console da Anthropic.</p>
+
     <div class="grouplabel">Busca de vídeos</div>
     <input id="ytKey" placeholder="Chave da API do YouTube (opcional)" value="${esc(settings.ytKey)}" autocapitalize="off" autocorrect="off" spellcheck="false">
     <p class="caption" style="margin-top:6px">Sem chave, a busca usa servidores gratuitos que às vezes ficam fora do ar. Uma chave grátis (Google Cloud → YouTube Data API v3) deixa a busca estável.</p>
@@ -1594,11 +1772,12 @@ function sheetSettings() {
       if (box.classList.contains('hidden') || !box.value.trim().startsWith('{')) { box.classList.remove('hidden'); box.value = ''; box.focus(); toast('Cole o backup e toque em Restaurar de novo'); return; }
       try { importLib(JSON.parse(box.value)); toast('Biblioteca restaurada ✓'); closeSheet(); renderHome(); } catch { toast('Backup inválido'); }
     },
-    done: () => { settings.ytKey = ($('#ytKey').value || '').trim(); saveSettings(); closeSheet(); if (S.phase === 'ready') renderReady(); }
+    done: () => { settings.ytKey = ($('#ytKey').value || '').trim(); settings.claudeKey = ($('#claudeKey').value || '').trim(); saveSettings(); closeSheet(); if (S.phase === 'ready') renderReady(); }
   });
   $$('#sheetContent [data-seg]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => applySetting(g.dataset.seg, b.dataset.v, g)));
   $$('#sheetContent [data-t]').forEach(b => b.onclick = () => { const k = b.dataset.t; settings[k] = !settings[k]; saveSettings(); b.classList.toggle('on', settings[k]); if (S.phase === 'play') renderGame(); });
   $('#ytKey').addEventListener('change', e => { settings.ytKey = e.target.value.trim(); saveSettings(); });
+  $('#claudeKey').addEventListener('change', e => { settings.claudeKey = e.target.value.trim(); saveSettings(); });
 }
 function applySetting(k, v, group) {
   if (['autoReplay', 'speed'].includes(k)) v = +v;
@@ -1617,6 +1796,7 @@ function sheetSongMore() {
     <div class="group">
       <button class="grow" data-a="pl">${icon('addlist')}<span>Adicionar à playlist</span></button>
       <button class="grow" data-a="yt">${icon('ext')}<span>Abrir no YouTube</span></button>
+      ${has ? `<button class="grow" data-a="explain"><span class="aiico">✨</span><span>Entender a música<small>Explicação completa feita por IA</small></span></button>` : ''}
     </div>
     <div class="grouplabel">Letra</div>
     <div class="group">
@@ -1628,6 +1808,7 @@ function sheetSongMore() {
     pl: () => sheetAddToPlaylist(v),
     yt: () => { closeSheet(); window.open('https://www.youtube.com/watch?v=' + v.id, '_blank', 'noopener'); },
     kar: () => { closeSheet(); startKaraoke(); },
+    explain: () => sheetExplain(),
     resync: () => { closeSheet(); if (inSession()) quitGame(); startSync(S.entries.filter(e => e.text).map(e => e.text)); },
     edit: () => sheetEditLRC(),
     change: () => { closeSheet(); if (inSession()) quitGame(); S.phase = 'lyrics'; showPane('pLyrics'); prefillLyrics(); }
@@ -1721,6 +1902,8 @@ $('#playBtn').onclick = startGame;
   $$(sel + ' button').forEach(b => b.onclick = () => applySetting(key, b.dataset.v)));
 
 ['#lPrev', '#lCur'].forEach(sel => $(sel).addEventListener('click', e => {
+  const ai = e.target.closest('[data-trai]');
+  if (ai) { const l = S.lines[+ai.dataset.trai]; if (l) sheetAiTr(l.text, settings.lang, renderGame); return; }
   const t = e.target.closest('[data-trfix]');
   if (t) { const l = S.lines[+t.dataset.trfix]; if (l) sheetFixTr(l.text, settings.lang, renderGame); return; }
   const b = e.target.closest('[data-bm]'); if (b) toggleSavePhrase(S.lines[+b.dataset.bm]);
@@ -1741,6 +1924,7 @@ $('#skipIntro').onclick = skipToLyrics;
 $('#gAdj').onclick = () => sheetAdjustVerse(S.cur);
 
 $('#karBtn').onclick = startKaraoke;
+$('#explainBtn').onclick = () => sheetExplain();
 $('#kQuit').onclick = confirmQuit;
 $('#kSet').onclick = sheetSettings;
 $('#kSpeed').onclick = cycleSpeed;
@@ -1752,6 +1936,8 @@ $('#kTr').onclick = () => {
   renderKaraoke(); translateAllKaraoke();
 };
 $('#kList').addEventListener('click', async e => {
+  const kai = e.target.closest('[data-kai]');
+  if (kai) { sheetAiTr(S.lines[+kai.dataset.kai].text, settings.lang, () => S.lines.forEach((_, i) => paintKarLine(i))); return; }
   const ktr = e.target.closest('[data-ktr]');
   if (ktr) { sheetFixTr(S.lines[+ktr.dataset.ktr].text, settings.lang, () => S.lines.forEach((_, i) => paintKarLine(i))); return; }
   const adj = e.target.closest('[data-kadj]');

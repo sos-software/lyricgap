@@ -455,3 +455,23 @@ body.playing #song{padding-top:var(--st)}
 .tropt > span{display:block;font-size:15.5px;line-height:1.4}
 .tropt textarea{margin-top:2px;background:var(--s1);font-size:15.5px}
 .tropt .btn.wide{margin-top:8px}
+
+/* ============ AI (Claude) ============ */
+.trai{display:inline-grid;place-items:center;width:28px;height:28px;margin:-4px 0 -4px 2px;vertical-align:middle;border-radius:50%;font-size:14px;font-style:normal;opacity:.85;filter:saturate(1.2)}
+.trai:hover,.trai:active{background:var(--s2);opacity:1}
+.aibox{background:var(--s2);border-radius:14px;padding:14px;margin-top:12px;min-height:56px}
+.aitr{font-size:17px;font-weight:650;line-height:1.4;color:var(--text)}
+.ainote{font-size:14px;line-height:1.5;color:var(--text2);margin-top:8px}
+.ainote b{color:#c4b5fd}
+.ainote.err{color:#fb7185;margin-top:0}
+.aisaved{display:block;margin-top:10px;font-size:12px;color:var(--ok)}
+.tropt.aiopt{border:1px solid rgba(139,92,246,.35);background:rgba(139,92,246,.1)}
+.aiico{width:22px;text-align:center;font-size:17px}
+#explainBtn{margin-top:14px}
+.explain{background:var(--s2);border-radius:14px;padding:4px 16px 12px;margin-top:4px;font-size:14.5px;line-height:1.6;color:var(--text2)}
+.explain h4{margin:14px 0 4px;font-size:15px;color:var(--text)}
+.explain p{margin:4px 0}
+.explain ul{margin:4px 0;padding-left:18px}
+.explain li{margin:4px 0}
+.explain b{color:var(--text)}
+.trbtns{white-space:nowrap;display:inline-block}

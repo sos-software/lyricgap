@@ -176,6 +176,19 @@ Toque na que faz mais sentido. Ela fica salva **para aquele verso** (e para toda
 - O Google é chamado pelo endereço público do widget do Google Tradutor, **sem chave**. Não é uma API oficial: funciona hoje, mas pode parar sem aviso. Nesse caso o painel mostra "não disponível agora" e as outras opções continuam funcionando.
 - **Por que não DeepL:** o DeepL bloqueia chamadas feitas direto do navegador, e o app roda no GitHub Pages, sem servidor para intermediar.
 
+### Inteligência artificial (Claude) ✨
+
+Opcional, com a **sua própria chave da API da Claude** (Anthropic). Coloque a chave em ⚙ → *Inteligência artificial (Claude)*. Se você tocar no ✨ sem chave, o app pede a chave na hora.
+
+- **✨ ao lado de cada tradução** (verso atual, cartão do verso anterior, karaokê e frases salvas; também como opção dentro do painel ✎):
+  - a IA traduz **aquele verso** para um português natural, usando a **letra inteira da música como contexto** (gírias, duplo sentido, referências);
+  - quando houver, ela também explica a expressão do verso em uma ou duas frases (*Entenda: …*);
+  - a tradução fica salva para o verso como as outras (entra no backup), e o botão *Desfazer* volta para a anterior.
+- **✨ Entender a música** (na tela de jogar e no menu ⋯): uma explicação completa em português, que aparece enquanto é escrita. Tem resumo, a história e o sentido, expressões e gírias com o significado, contexto (artista, época, referências) e palavras para praticar. Fica salva com a música; *Gerar de novo* pede outra.
+- **Modelo:** *Haiku 5.5* (padrão: rápido e barato) ou *Sonnet 5.5* (mais caprichado), em ⚙. Uma tradução de verso custa uma fração de centavo; uma explicação completa custa poucos centavos com o Haiku.
+- **Segurança da chave:** ela fica **só neste aparelho** (configurações do navegador), não vai para o código, para o GitHub nem para o backup da biblioteca. As chamadas saem do seu navegador direto para a Anthropic, pelo SDK oficial (`@anthropic-ai/sdk`, versão fixada, carregado do jsDelivr). Como qualquer chave guardada no navegador, quem tiver acesso ao aparelho pode encontrá-la, então defina um **limite de gastos** para ela no console da Anthropic.
+- Erros aparecem em português: chave inválida, sem permissão para o modelo, limite de uso atingido ou sem conexão.
+
 ### Busca de vídeos
 
 - **Filtro Músicas / Todos os vídeos:** por padrão a busca traz só **músicas** (YouTube Music: áudios do álbum e clipes oficiais). Os resultados são **ordenados pelo que você digitou**: título e artista que batem com as suas palavras vêm primeiro, versões *slowed / 8D / remix / cover / tutorial* descem (a menos que você peça por elas) e o número de visualizações desempata, para a versão famosa aparecer antes. Cada resultado ganha um selo do LRCLIB: **LETRA ✓** (sincronizada), **SÓ TEXTO** (você sincroniza) ou **SEM LETRA**. Para palestras e outros vídeos, escolha **Todos os vídeos**.
@@ -225,6 +238,8 @@ Em ⚙ → *Biblioteca*:
 | Sons de acerto/erro | Ligados |
 | Sincronia desta música (−/+) | 0.0s. Use − se a letra aparece antes da voz |
 | Chave da API do YouTube | Vazia (usa os servidores Piped) |
+| Chave da API da Claude | Vazia (o ✨ pede a chave quando for usado) |
+| Modelo da IA | Haiku 5.5 |
 
 ## Rodar localmente
 
@@ -253,8 +268,8 @@ node server.js
 
 **Dados no localStorage:**
 
-- `lg:lib`: músicas (letra LRC, sincronia, recorde, favorito), playlists, recentes, frases, traduções escolhidas por você (`trOverride`) e estatísticas de progresso (`stats`: totais e atividade por dia).
-- `lg:settings`: configurações.
+- `lg:lib`: músicas (letra LRC, sincronia, recorde, favorito, explicação da IA em `explain`), playlists, recentes, frases, traduções escolhidas por você (`trOverride`), notas da IA por verso (`aiNotes`) e estatísticas de progresso (`stats`: totais e atividade por dia).
+- `lg:settings`: configurações, incluindo as chaves de API (YouTube e Claude). **Não entra no backup.**
 - `lg:tr`: cache de traduções.
 
 **Como o jogo decide os tempos:** cada frase vai do seu tempo no LRC até o início da próxima (no máximo 10s). No modo Pausa, o vídeo pausa 0,15s antes do fim da frase. No Fluxo, a frase que termina sem resposta é revelada em silêncio.
@@ -271,5 +286,6 @@ node server.js
 
 ## Ideias futuras
 
-- **Traduções ainda melhores:** tradução por IA com chave (entende contexto e gírias e pode explicar expressões), ou DeepL através de um pequeno servidor intermediário.
+- Perguntar à IA sobre um verso ("por que esse tempo verbal?"), num chat curto dentro da música.
+- DeepL através de um pequeno servidor intermediário.
 - Treinar só as frases salvas, como flashcards com áudio.
