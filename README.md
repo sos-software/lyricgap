@@ -276,7 +276,8 @@ node server.js
 | `index.html` | Estrutura das telas (início, música, jogo), ícones SVG e o painel inferior. |
 | `style.css` | Visual (tema escuro, controle em cruz, botões redondos, painéis). |
 | `app.js` | Toda a lógica: biblioteca, busca, player, letras, sincronização, jogo, frases, configurações. |
-| `manifest.json`, `icons/` | Instalação como app (PWA) na Tela de Início. |
+| `manifest.json`, `icons/` | Instalação como app (PWA) na Tela de Início. Ícone: uma colcheia em que a cabeça é um “o” e a bandeirinha um “s” (`icons/icon.svg`). |
+| `branding/` | As 4 propostas de logo (a escolhida foi a opção C). |
 | `server.js` | Servidor local simples para testes. |
 
 **Dados no localStorage:**

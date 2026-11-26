@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" font-family="'Segoe UI','SF Pro Display',Inter,Arial,sans-serif">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset=".55" stop-color="#6366f1"/><stop offset="1" stop-color="#06b6d4"/></linearGradient>
+  <linearGradient id="gh" x1="0" y1="0" x2="512" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
+    <linearGradient id="gw" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient>
+    <symbol id="ic" viewBox="0 0 512 512"><rect width="512" height="512" rx="114" fill="#14141f"/><rect x="6" y="6" width="500" height="500" rx="108" fill="none" stroke="url(#gh)" stroke-opacity=".35" stroke-width="4"/>
+      <g fill="url(#gh)">
+        <circle cx="54" cy="262" r="16"/><circle cx="96" cy="262" r="16"/><circle cx="138" cy="262" r="16"/>
+        <circle cx="374" cy="262" r="16"/><circle cx="416" cy="262" r="16"/><circle cx="458" cy="262" r="16"/>
+        <rect x="204" y="150" width="14" height="182" rx="7"/><rect x="262" y="150" width="14" height="182" rx="7"/><rect x="320" y="150" width="14" height="182" rx="7"/>
+        <rect x="204" y="146" width="130" height="30" rx="8"/>
+        <ellipse cx="190" cy="336" rx="27" ry="20" transform="rotate(-22 190 336)"/>
+        <ellipse cx="248" cy="336" rx="27" ry="20" transform="rotate(-22 248 336)"/>
+        <ellipse cx="306" cy="336" rx="27" ry="20" transform="rotate(-22 306 336)"/>
+      </g></symbol>
+  </defs>
+  <rect width="1200" height="675" fill="#09090f"/>
+  <text x="60" y="66" font-size="22" font-weight="700" fill="#8b5cf6" letter-spacing="3">OPÇÃO B</text>
+  <text x="200" y="66" font-size="22" font-weight="600" fill="#b9b9c9">SOS em ritmo</text>
+  <use href="#ic" x="70" y="118" width="440" height="440"/>
+  <g transform="translate(590 350)"><text x="0" y="0" font-size="118" font-weight="700" letter-spacing="18" fill="#f4f4f8">VERSA</text></g>
+  <text x="596" y="408" font-size="30" fill="#b9b9c9">Aprenda idiomas verso a verso</text>
+  <text x="596" y="452" font-size="22" fill="#7c7c93">por sos</text>
+  <g transform="translate(596 500)">
+    <use href="#ic" x="0" y="0" width="60" height="60"/><use href="#ic" x="78" y="12" width="40" height="40"/><use href="#ic" x="134" y="20" width="24" height="24"/>
+    <text x="174" y="38" font-size="18" fill="#7c7c93">tamanhos reais no celular</text>
+  </g>
+  <foreignObject x="60" y="590" width="1080" height="70"><div xmlns="http://www.w3.org/1999/xhtml" style="font:20px 'Segoe UI',Arial,sans-serif;color:#7c7c93;line-height:1.4">O código Morse de SOS (· · · — — — · · ·) virou ritmo: três pontos, três colcheias ligadas e mais três pontos. Discreto e com cara de música.</div></foreignObject>
+</svg>
