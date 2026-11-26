@@ -155,6 +155,19 @@ O Google só entra quando você pede uma tradução melhor (veja abaixo).
 - Uma letra comunitária pode ter pequenos erros. Dá para corrigir em **Editar LRC** na tela antes de jogar.
 - O app não guarda nem distribui letras: elas são buscadas na hora, ou coladas por você, e ficam só no seu aparelho.
 
+### Letra fora de tempo: ⚡ Sincronia rápida
+
+Quando a letra encontrada não bate com o vídeo (clipe com introdução, versão ao vivo, editada, mais lenta…):
+
+- **Escolha automática da versão certa:** na lista de letras, as versões com a **mesma duração do vídeo** vêm primeiro e ganham o selo **MESMA DURAÇÃO** (mesma gravação = mesmo tempo). As outras mostram quantos segundos de diferença têm.
+- **Aviso:** se você escolher uma versão com mais de 4 s de diferença, a tela de jogar mostra *"A letra pode estar fora de tempo"*, com os botões **⚡ Sincronia rápida** e **Está certa**.
+- **⚡ Sincronia rápida** (também no menu ⋯):
+  1. o vídeo toca perto de onde o 1º verso deve começar; toque em **AGORA** quando a voz começar aquele verso, e a letra inteira é deslocada;
+  2. opcional: o app pula para um verso perto do fim e você toca de novo. Isso corrige também a **velocidade** (as frases do meio são espalhadas na proporção certa). Se o segundo toque ficar muito longe do esperado, ele é ignorado.
+
+  Os botões ⏪ 5s / ⏭ 5s ajudam se você perder o momento. O resultado é gravado na letra (LRC) da música.
+- **Por que não é 100% automática:** o app não consegue ouvir o áudio do vídeo (o player do YouTube é de outro site, e o navegador bloqueia o acesso ao som), e as legendas automáticas do YouTube não podem ser lidas por outro site. Por isso a sincronia usa a duração do vídeo e os seus toques.
+
 ### Tradução: [MyMemory](https://mymemory.translated.net) (empresa Translated)
 
 - Primeiro o serviço procura a frase numa **memória de traduções feitas por pessoas**. Se não encontra, usa **tradução automática**.

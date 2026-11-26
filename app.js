@@ -713,7 +713,11 @@ async function searchLyrics() {
     if (track) res = await lrclib(artist ? { track_name: track, artist_name: artist } : { track_name: track });
     if (!res.length) res = await lrclib({ q: `${track} ${artist}`.trim() });
     if (!res.length && track) res = await lrclib({ q: track });
-    res = res.filter(r => r.syncedLyrics || r.plainLyrics).sort((a, b) => (!!b.syncedLyrics) - (!!a.syncedLyrics)).slice(0, 8);
+    // synced first, then the version whose duration is closest to the video (same recording → same timing)
+    const vdur = playerReady ? player.getDuration() : 0;
+    const gap = r => vdur && r.duration ? Math.abs(vdur - r.duration) : 999;
+    res = res.filter(r => r.syncedLyrics || r.plainLyrics)
+      .sort((a, b) => ((!!b.syncedLyrics) - (!!a.syncedLyrics)) || (gap(a) - gap(b))).slice(0, 8);
     if (!res.length) {
       box.innerHTML = '<div class="notfound"><b>Letra não encontrada</b><span>Essa música ainda não está no banco de letras. Cole a letra de qualquer site e sincronize uma vez. Fica salvo para sempre.</span><button class="btn primary wide" id="goPaste">Colar letra</button></div>';
       $('#goPaste').onclick = () => $('#lyrTabs [data-tab=paste]').click();
@@ -724,8 +728,13 @@ async function searchLyrics() {
     res.forEach(r => {
       const b = document.createElement('div'); b.className = 'item';
       const diff = vd && r.duration ? Math.abs(vd - r.duration) : 0;
-      b.innerHTML = `<div class="meta"><b>${esc(r.trackName)} — ${esc(r.artistName)}</b><small>${r.syncedLyrics ? '<span class="badge">SINCRONIZADA</span>' : 'só texto · você sincroniza'}${r.duration ? ' · ' + fmtDur(r.duration) : ''}${diff > 4 ? ' · ⚠ duração diferente do vídeo' : ''}</small></div>`;
-      b.onclick = () => { if (r.syncedLyrics) setEntries(parseLRC(r.syncedLyrics), true); else startSync(plainLines(r.plainLyrics)); };
+      b.innerHTML = `<div class="meta"><b>${esc(r.trackName)} — ${esc(r.artistName)}</b><small>${r.syncedLyrics ? '<span class="badge">SINCRONIZADA</span>' : 'só texto · você sincroniza'}${r.syncedLyrics && vd && r.duration && diff <= 2 ? '<span class="badge">MESMA DURAÇÃO</span>' : ''}${r.duration ? ' · ' + fmtDur(r.duration) : ''}${diff > 4 ? ` · ⚠ ${Math.round(diff)}s de diferença do vídeo` : ''}</small></div>`;
+      b.onclick = () => {
+        if (!r.syncedLyrics) return startSync(plainLines(r.plainLyrics));
+        // a different duration usually means a clip intro / live / edited version: suggest the quick sync
+        if (diff > 4) S.v.syncHint = Math.round(diff); else delete S.v.syncHint;
+        setEntries(parseLRC(r.syncedLyrics), true);
+      };
       box.appendChild(b);
     });
   } catch (e) {
@@ -750,11 +759,70 @@ function renderReady() {
   $('#rLevel').textContent = DIFF_LABEL[settings.difficulty];
   const mark = (id, val) => $$(id + ' button').forEach(b => b.classList.toggle('on', b.dataset.v === String(val)));
   mark('#rdPace', settings.pace); mark('#rdMode', settings.mode); mark('#rdDiff', settings.difficulty);
+  const hint = $('#syncHint');
+  if (S.v && S.v.syncHint) {
+    hint.innerHTML = `<div class="synchint"><b>⚠ A letra pode estar fora de tempo</b><span>Ela tem ${S.v.syncHint}s de diferença da duração do vídeo (introdução do clipe, versão ao vivo…). Acerte com 1 ou 2 toques.</span>
+      <div class="sheetbtns"><button class="btn primary" id="qsGo">⚡ Sincronia rápida</button><button class="btn" id="qsDismiss">Está certa</button></div></div>`;
+    $('#qsGo').onclick = sheetQuickSync;
+    $('#qsDismiss').onclick = () => { delete S.v.syncHint; saveLib(); renderReady(); };
+  } else hint.innerHTML = '';
   $('#readyInfo').textContent = (settings.pace === 'flow'
     ? 'A música não para: responda enquanto o verso toca. Erros só aparecem no final.'
     : 'O vídeo pausa no fim de cada frase. Acertou, continua. Errou, a frase toca de novo.')
     + ` Cada palavra certa vale 1 ponto e terminar a música vale +${SONG_BONUS}.`;
 }
+/* ================= quick sync (1–2 taps) ================= */
+/* The app can't hear the YouTube audio (cross-origin player) and video captions aren't reachable from the browser,
+   so fully automatic alignment isn't possible. Instead: tap once when the voice starts the 1st verse (shifts the whole
+   lyric), and optionally once more on a later verse (also corrects speed, for slowed/sped/live versions). */
+function sheetQuickSync() {
+  if (!S.entries.length || !playerReady) return;
+  if (inSession()) quitGame();
+  const lines = S.entries.filter(e => e.text);
+  if (lines.length < 2) return;
+  const first = lines[0], later = lines[Math.max(1, Math.floor(lines.length * 0.75))];
+  const vd = player.getDuration() || 0, lrcEnd = S.entries[S.entries.length - 1].t;
+  const guess = vd > lrcEnd + 3 ? Math.min(vd - lrcEnd - 2, 60) : 0;   // longer video: probably an intro before the song
+  let step = 1, tap1 = null;
+  const cue = t => { player.seekTo(Math.max(0, t), true); player.playVideo(); };
+  const stop = () => { if (playerReady) player.pauseVideo(); };
+  const apply = (t1, t2) => {
+    let a = 1;
+    if (t2 != null) {
+      const k = (t2 - t1) / (later.t - first.t);
+      if (k > 0.8 && k < 1.25) a = k; else toast('Segundo toque ignorado (longe demais do esperado)');
+    }
+    S.entries = S.entries.map(e => ({ ...e, t: Math.max(0, +(a * (e.t - first.t) + t1).toFixed(2)) }));
+    S.offset = 0; delete S.v.syncHint;
+    saveSong(); closeSheet(); stop(); renderReady();
+    toast(a !== 1 ? `⚡ Sincronizado (início e velocidade ${Math.round(a * 100)}%)` : '⚡ Letra sincronizada');
+  };
+  const render = () => {
+    const ln = step === 1 ? first : later;
+    openSheet(`<h3>⚡ Sincronia rápida</h3>
+      <div class="qsstep">Passo ${step} de 2${step === 2 ? ' · opcional' : ''}</div>
+      <p class="caption center-text" style="margin-top:4px">${step === 1 ? 'Toque em <b>AGORA</b> no instante em que a voz começar este verso:' : 'Para acertar também a velocidade, toque quando a voz começar este verso:'}</p>
+      <div class="adjline qsline">${esc(ln.text)}</div>
+      <div class="qsbox"><button class="markbtn" data-a="now"><span>AGORA</span></button></div>
+      <div class="chips center-row"><button class="chip" data-a="back">⏪ 5s</button><button class="chip" data-a="pp">⏯ Play/Pausa</button><button class="chip" data-a="fwd">5s ⏩</button></div>
+      <div class="sheetbtns">${step === 2 ? '<button class="btn" data-a="skip">Pular e salvar</button>' : ''}<button class="btn" data-a="cancel">Cancelar</button></div>
+      <p class="caption center-text">Perdeu o momento? Use ⏪ 5s e toque de novo.</p>`, {
+      now: () => {
+        const t = player.getCurrentTime() - 0.2;   // average reaction time
+        if (step === 1) { tap1 = t; step = 2; render(); cue(tap1 + (later.t - first.t) - 6); }
+        else apply(tap1, t);
+      },
+      back: () => cue(player.getCurrentTime() - 5),
+      fwd: () => cue(player.getCurrentTime() + 5),
+      pp: () => player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo(),
+      skip: () => apply(tap1, null),
+      cancel: () => { closeSheet(); stop(); }
+    }, stop);
+  };
+  render();
+  cue(first.t + guess - 6);
+}
+
 /* ================= sync mode ================= */
 function startSync(lines) {
   if (!lines.length) { toast('Nenhuma linha de letra encontrada.'); return; }
@@ -1801,6 +1869,7 @@ function sheetSongMore() {
     <div class="grouplabel">Letra</div>
     <div class="group">
       ${has ? `<button class="grow" data-a="kar">${icon('note')}<span>Modo karaokê<small>A letra rola junto com a música, com tradução</small></span></button>
+      <button class="grow" data-a="quick"><span class="aiico">⚡</span><span>Sincronia rápida<small>Letra fora de tempo? Acerte com 1 ou 2 toques</small></span></button>
       <button class="grow" data-a="resync">${icon('sync')}<span>Sincronizar de novo<small>Marcar o tempo de cada frase outra vez</small></span></button>
       <button class="grow" data-a="edit">${icon('edit')}<span>Editar LRC<small>Corrigir texto ou tempos</small></span></button>` : ''}
       <button class="grow" data-a="change">${icon('text')}<span>${has ? 'Trocar letra' : 'Buscar ou colar letra'}</span></button>
@@ -1808,6 +1877,7 @@ function sheetSongMore() {
     pl: () => sheetAddToPlaylist(v),
     yt: () => { closeSheet(); window.open('https://www.youtube.com/watch?v=' + v.id, '_blank', 'noopener'); },
     kar: () => { closeSheet(); startKaraoke(); },
+    quick: () => { closeSheet(); sheetQuickSync(); },
     explain: () => sheetExplain(),
     resync: () => { closeSheet(); if (inSession()) quitGame(); startSync(S.entries.filter(e => e.text).map(e => e.text)); },
     edit: () => sheetEditLRC(),
