@@ -109,7 +109,10 @@ As palavras escolhidas evitam artigos e palavras muito curtas. As opções errad
 - **☆ Favoritos:** a estrela ao lado de qualquer música ou na barra da música.
 - **＋ Playlists:** adicione músicas a playlists. Uma playlist toca em sequência, e no fim de cada música aparece **"Próxima música ▶"**.
 - **Recentes:** últimas 50 músicas abertas.
-- **Músicas de exemplo:** na primeira vez que o app abre, 12 músicas já aparecem em *Recentes* para começar sem buscar (The Strokes, Sia, Coldplay, Ben E. King, Black Eyed Peas, Angels & Airwaves, Journey, Queen, AURORA, The Cranberries e Sixpence None The Richer). Todas têm letra sincronizada no LRCLIB. Quem já usava o app recebe as músicas uma vez, depois das suas. A lista fica em `SAMPLES`, no `app.js`.
+- **Músicas de exemplo:** 16 músicas para começar sem buscar: The Killers (*All These Things That I've Done*, *Read My Mind*), The Cranberries, Coldplay, The Strokes, Queen, Sia, Maroon 5, Aya Nakamura, Billie Eilish, Maná, Angels & Airwaves, Adele, Ashe, Ben E. King e Phoebe Bridgers.
+  - Na primeira abertura do app, elas aparecem em *Recentes*. Depois, ficam sempre na seção **Para começar** da tela inicial.
+  - Sempre que possível são o áudio oficial do álbum, que bate com o tempo das letras. Todas podem tocar dentro do app e têm letra sincronizada com a mesma duração (conferido em 26/11/2026).
+  - Exemplos antigos que o usuário nunca abriu saem de *Recentes* quando a lista muda. A lista fica em `SAMPLES`, no `app.js`.
 - **🔖 Frases:** cada frase salva guarda:
   - o texto completo e a tradução;
   - a música (título e artista);

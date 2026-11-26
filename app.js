@@ -40,24 +40,31 @@ lib.phrases = lib.phrases || [];
 lib.stats = Object.assign({ songs: 0, lines: 0, words: 0, misses: 0, ms: 0, days: {}, uniq: [] }, lib.stats || {});
 // scoring v2: 1 point per correct word, +10 for a completed song. Old records (100s of points) no longer compare.
 // example songs, so the app opens with something to play. Added once to "Recentes" (after the user's own songs).
-const SAMPLES = [
-  ['knU9gRUWCno', 'The Strokes - Someday', 'The Strokes'],
-  ['tMVgLulcGQA', 'Sia - House On Fire', 'Sia'],
-  ['Am8zzSK5ORw', 'Coldplay - Ink', 'Coldplay'],
-  ['Tm0m2S4e6FE', 'Ben E. King - Stand By Me', 'Ben E. King'],
-  ['tdVAqxNLXiw', 'Coldplay - Yellow', 'Coldplay'],
-  ['WpYeekQkAdc', 'The Black Eyed Peas - Where Is The Love?', 'The Black Eyed Peas'],
-  ['8tsUxsZ2IqU', 'Angels & Airwaves - Lifeline', 'Angels & Airwaves'],
-  ['VcjzHMhBtf0', "Journey - Don't Stop Believin'", 'Journey'],
-  ['HdiILZVAk5A', "Queen - Don't Stop Me Now", 'Queen'],
-  ['d_HlPboLRL8', 'AURORA - Runaway', 'AURORA'],
-  ['Zz-DJr1Qs54', 'The Cranberries - Ode To My Family', 'The Cranberries'],
-  ['v45F0YesdZM', 'Sixpence None The Richer - Kiss Me', 'Sixpence None The Richer']
+const SAMPLES = [   // official album audio (same timing as the lyrics); all embeddable, all with synced lyrics
+  ['AUAxlOfw2O0', "The Killers - All These Things That I've Done", 'The Killers'],
+  ['NMZ74lDDn2A', 'The Cranberries - Ode To My Family', 'The Cranberries'],
+  ['Mc_6rKOwhxg', 'The Killers - Read My Mind', 'The Killers'],
+  ['Qjo_x_8vrVY', 'Coldplay - Ink', 'Coldplay'],
+  ['2u4ZlLpY7_Y', 'The Strokes - Someday', 'The Strokes'],
+  ['1UjLFMg18cY', "Queen - Don't Stop Me Now", 'Queen'],
+  ['WtJ5GY2A8eo', 'Sia - House On Fire', 'Sia'],
+  ['D2mlCmROm2M', 'Maroon 5 - Girls Like You', 'Maroon 5'],
+  ['EkGiGf8utCM', 'Aya Nakamura - Copines', 'Aya Nakamura'],
+  ['WKZO-CWeOVA', 'Billie Eilish - Birds of a Feather', 'Billie Eilish'],
+  ['mHzBysO5HF0', 'Maná - Ojalá Pudiera Borrarte', 'Maná'],
+  ['bmBf_YedOQc', 'Angels & Airwaves - Epic Holiday', 'Angels & Airwaves'],
+  ['X3Sdg1_-M0c', 'Adele - Send My Love (To Your New Lover)', 'Adele'],
+  ['BVR3k32x9h0', 'Ashe - Stop The Wedding!', 'Ashe'],
+  ['b-D5yAAXYng', 'Ben E. King - Stand By Me', 'Ben E. King'],
+  ['W-Khe7DInxo', 'Phoebe Bridgers - Scott Street', 'Phoebe Bridgers']
 ];
-if (!lib.samplesV) {
+if ((lib.samplesV || 0) < 2) {
+  // drop old example songs the user never opened (still flagged "sample"), then add the current set
+  const keep = new Set(SAMPLES.map(x => x[0]));
+  Object.values(lib.videos).forEach(v => { if (v.sample && !keep.has(v.id)) { delete lib.videos[v.id]; lib.recent = lib.recent.filter(id => id !== v.id); } });
   SAMPLES.forEach(([id, title, author]) => { if (!lib.videos[id]) lib.videos[id] = { id, title, author, lrc: null, offset: 0, best: 0, fav: false, updated: 0, sample: true }; });
-  lib.recent = [...lib.recent, ...SAMPLES.map(s => s[0]).filter(id => !lib.recent.includes(id))].slice(0, 50);
-  lib.samplesV = 1; store.set('lg:lib', lib);
+  if (!lib.samplesV) lib.recent = [...lib.recent, ...SAMPLES.map(x => x[0]).filter(id => !lib.recent.includes(id))].slice(0, 50);   // first run only
+  lib.samplesV = 2; store.set('lg:lib', lib);
 }
 if (lib.scoreV !== 2) { Object.values(lib.videos).forEach(v => { v.best = 0; }); lib.scoreV = 2; store.set('lg:lib', lib); }
 
@@ -287,6 +294,11 @@ function renderHomeTab() {
       const s = section(recent.slice(1, 15).every(x => x.sample) ? 'Músicas de exemplo' : 'Recentes'); const car = el('div', 'carousel');
       recent.slice(1, 15).forEach(x => car.appendChild(ccard(x))); s.appendChild(car); box.appendChild(s);
     }
+    if (!recent.slice(1, 15).every(x => x.sample)) {
+      const s2 = section('Para começar'); const car2 = el('div', 'carousel');
+      SAMPLES.forEach(([id, title, author]) => car2.appendChild(ccard(lib.videos[id] || { id, title, author })));
+      s2.appendChild(car2); box.appendChild(s2);
+    }
     const favs = Object.values(lib.videos).filter(x => x.fav).sort((a, b) => b.updated - a.updated);
     if (favs.length) {
       const s = section('Favoritos', () => { H.libTab = 'fav'; setTab('library'); }); const car = el('div', 'carousel');
@@ -308,13 +320,13 @@ function renderHomeTab() {
 
 // search suggestions: recent hits by language (each chip runs that search)
 const SUGGEST = [
-  ['EN', 'Inglês', ['Billie Eilish Birds of a Feather', 'Sabrina Carpenter Espresso', 'Lady Gaga Bruno Mars Die With A Smile', 'Ed Sheeran Perfect']],
-  ['ES', 'Espanhol', ['Bad Bunny DtMF', 'Shakira Soltera', 'Karol G Si Antes Te Hubiera Conocido', 'Karol G Shakira TQG']],
-  ['FR', 'Francês', ['Aya Nakamura Djadja', 'Stromae Papaoutai', 'ZAZ Je veux', 'Indila Dernière danse']],
-  ['DE', 'Alemão', ['Peter Fox Zukunft Pink', 'Nina Chuba Wildberry Lillet', 'Apache 207 Roller', 'Sido Astronaut']],
-  ['JA', 'Japonês', ['YOASOBI Idol', 'Creepy Nuts Bling-Bang-Bang-Born', 'Fujii Kaze Shinunoga E-Wa', 'Kenshi Yonezu Lemon']],
-  ['KO', 'Coreano', ['NewJeans Ditto', 'aespa Supernova', 'IVE Love Dive', 'BTS Spring Day']],
-  ['IT', 'Italiano', ['Måneskin Zitti e buoni', 'Mahmood Soldi', 'Laura Pausini La soledad']]
+  ['🇺🇸', 'Inglês', ['Billie Eilish Birds of a Feather', 'Sabrina Carpenter Espresso', 'Lady Gaga Bruno Mars Die With A Smile', 'Ed Sheeran Perfect']],
+  ['🇪🇸', 'Espanhol', ['Bad Bunny DtMF', 'Shakira Soltera', 'Karol G Si Antes Te Hubiera Conocido', 'Karol G Shakira TQG']],
+  ['🇫🇷', 'Francês', ['Aya Nakamura Djadja', 'Stromae Papaoutai', 'ZAZ Je veux', 'Indila Dernière danse']],
+  ['🇩🇪', 'Alemão', ['Peter Fox Zukunft Pink', 'Nina Chuba Wildberry Lillet', 'Apache 207 Roller', 'Sido Astronaut']],
+  ['🇯🇵', 'Japonês', ['YOASOBI Idol', 'Creepy Nuts Bling-Bang-Bang-Born', 'Fujii Kaze Shinunoga E-Wa', 'Kenshi Yonezu Lemon']],
+  ['🇰🇷', 'Coreano', ['NewJeans Ditto', 'aespa Supernova', 'IVE Love Dive', 'BTS Spring Day']],
+  ['🇮🇹', 'Italiano', ['Måneskin Zitti e buoni', 'Mahmood Soldi', 'Laura Pausini La soledad']]
 ];
 function renderSearchTab() {
   const box = $('#searchList'); box.innerHTML = '';
@@ -328,7 +340,7 @@ function renderSearchTab() {
   if (!H.results) {
     const s = el('div', ''); s.appendChild(el('div', 'sectionhead', '<h2 style="font-size:17px">Sucessos para praticar</h2>'));
     SUGGEST.forEach(([flag, name, songs]) => {
-      s.appendChild(el('div', 'suggesthead', `<span class="lc">${flag}</span>${esc(name)}`));
+      s.appendChild(el('div', 'suggesthead', `<span class="flag">${flag}</span>${esc(name)}`));
       const wrap = el('div', 'suggest');
       songs.forEach(q => { const b = el('button', '', esc(q)); b.onclick = () => { $('#q').value = q; doSearch(q); }; wrap.appendChild(b); });
       s.appendChild(wrap);

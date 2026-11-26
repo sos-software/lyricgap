@@ -579,3 +579,4 @@ body.playing #song{padding-top:var(--st)}
 .prevpill{display:inline-flex;align-items:center;gap:6px;padding:5px 12px 5px 9px;border-radius:999px;font-size:12px;font-weight:600;color:var(--muted);background:var(--s1);border:1px solid var(--line)}
 .prevpill svg{width:13px;height:13px;transform:rotate(90deg)}
 .prevpill:active{color:var(--text)}
+.suggesthead .flag{font-size:18px;line-height:1}
