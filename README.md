@@ -187,6 +187,9 @@ Quando a letra encontrada não bate com o vídeo (clipe com introdução, versã
 - **Qualidade:** boa para entender o sentido geral, mas literal. Gírias, expressões idiomáticas e metáforas podem sair erradas ou estranhas.
 - **Limite gratuito:** cerca de 5.000 caracteres por dia (umas 3 músicas novas por dia). As traduções ficam guardadas no aparelho, então repetir uma música não gasta o limite.
 - **Quando o limite acaba (ou o serviço falha):** o app passa a usar automaticamente o tradutor alternativo (o mesmo do painel ✎), para nenhum verso ficar sem tradução, e só volta a tentar o MyMemory depois de 6 horas.
+- **A música inteira em um ou dois pedidos:** ao começar o jogo ou o karaokê, o app pede a tradução de todos os versos de uma vez (blocos de ~1.500 caracteres) ao tradutor alternativo. Os tradutores gratuitos bloqueiam muitos pedidos seguidos, e antes era um pedido por verso. Só o que faltar é pedido verso a verso, com intervalo entre os pedidos.
+- **Sem desistir de um verso:** se a tradução de um verso falha, o app tenta de novo depois de ~45 segundos (no karaokê, faz mais uma rodada após 1 minuto). Se um serviço bloquear, ele fica 2 minutos de pausa.
+- **As traduções entram no backup**, então trocar de aparelho ou reinstalar o app da Tela de Início não as perde.
 - O idioma de origem é detectado pela letra de cada música (veja [Idiomas](#idiomas)). O destino é sempre português (PT-BR).
 
 ### Melhorar uma tradução (✎)

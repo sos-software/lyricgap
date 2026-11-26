@@ -1108,7 +1108,7 @@ async function startGame() {
   showPane('pGame'); document.body.classList.add('playing'); closeSheet();
   applyMode();
   $('#gSpeed').innerHTML = `<b>${settings.speed}x</b><span>Velocidade</span>`;
-  if (S.lines[0]) translateLine(S.lines[0]);
+  if (settings.translate) prefetchSongTranslations().then(() => { if (S.lines[0] && !S.lines[0].tr) translateLine(S.lines[0]); });
   setStatus('Ouça e complete', 'info');
   player.seekTo(0, true); player.setPlaybackRate(settings.speed); player.playVideo();
   renderGame();
@@ -1453,15 +1453,52 @@ async function fetchTr(text) {
       else if (tx && !/INVALID/i.test(tx)) return keep(decode(tx));
     } catch { }
   }
-  try { const g = await fetchGoogle(text, settings.lang); if (g) return keep(g); } catch { }
+  if (Date.now() > gOffUntil) {
+    try { const g = await fetchGoogle(text, settings.lang); if (g) return keep(g); }
+    catch { gOffUntil = Date.now() + 2 * 60e3; }   // blocked (too many requests): give it a break
+  }
   return null;
 }
+/* Free translators block bursts of requests. Instead of one request per verse, translate the whole song
+   in one or two requests (verses joined by line breaks, ~1500 characters each) and keep the result in the cache. */
+let gOffUntil = 0;
+async function fetchGoogleBatch(texts, lang) {
+  const r = await fetchT('https://translate.googleapis.com/translate_a/single?' + new URLSearchParams({ client: 'gtx', sl: lang, tl: 'pt', dt: 't', q: texts.join('\n') }), 10000);
+  if (!r.ok) throw new Error('http ' + r.status);
+  const j = await r.json();
+  const out = ((j && j[0]) || []).map(x => x[0]).join('').split('\n').map(s => s.trim());
+  return out.length === texts.length ? out : null;   // lines didn't line up: leave them to the per-verse path
+}
+async function prefetchSongTranslations() {
+  if (settings.lang === 'pt' || !S.entries.length || Date.now() < gOffUntil) return;
+  const lang = settings.lang;
+  const todo = [...new Set(S.entries.filter(e => e.text).map(e => e.text))].filter(t => !trOf(t, lang));
+  const chunks = []; let cur = [], len = 0;
+  for (const t of todo) { if (cur.length && len + t.length > 1500) { chunks.push(cur); cur = []; len = 0; } cur.push(t); len += t.length + 1; }
+  if (cur.length) chunks.push(cur);
+  for (const c of chunks) {
+    try {
+      const out = await fetchGoogleBatch(c, lang);
+      if (out) { c.forEach((t, i) => { if (out[i]) trCache[trKey(t, lang)] = out[i]; }); store.set('lg:tr', trCache); }
+    } catch { gOffUntil = Date.now() + 2 * 60e3; break; }
+    await wait(400);
+  }
+  // hand the cached translations to the verses on screen
+  S.lines.forEach((l, i) => {
+    if (l.tr) return;
+    const t = trOf(l.text, lang); if (!t) return;
+    l.tr = t; l.trFail = 0;
+    if (S.phase === 'karaoke') paintKarLine(i);
+  });
+  if (S.phase === 'play') renderGame();
+}
 async function translateLine(line, force = false) {
-  if ((!settings.translate && !force) || line.tr || line.trBusy || line.trFail) return;
+  if ((!settings.translate && !force) || line.tr || line.trBusy) return;
+  if (line.trFail && Date.now() - line.trFail < 45e3) return;   // failed recently: try again later, not never
   line.trBusy = true;
   const tr = await fetchTr(line.text);
   line.trBusy = false;
-  if (tr) line.tr = tr; else line.trFail = true;
+  if (tr) { line.tr = tr; line.trFail = 0; } else line.trFail = Date.now();
   if (S.phase === 'karaoke') paintKarLine(S.lines.indexOf(line)); else renderGame();
 }
 
@@ -1925,12 +1962,18 @@ function paintKarLine(i) {
 }
 async function translateAllKaraoke() {
   if (settings.lang === 'pt' || settings.karTr === 'off') return;
-  // nearest verses first, so what is about to be sung is ready before the rest
+  await prefetchSongTranslations();   // whole song in one or two requests
+  if (S.phase !== 'karaoke') return;
+  // whatever is still missing, verse by verse, nearest first (paced, so the free services don't block us)
   const start = Math.max(0, S.cur), order = S.lines.map((l, i) => i).sort((a, b) => (a < start) - (b < start) || Math.abs(a - start) - Math.abs(b - start));
   for (const i of order) {
     if (S.phase !== 'karaoke') return;
+    if (S.lines[i].tr) continue;
     await translateLine(S.lines[i], true);
+    await wait(250);
   }
+  // some verses failed (service busy): one more pass in a minute
+  if (S.lines.some(l => !l.tr)) setTimeout(() => { if (S.phase === 'karaoke') translateAllKaraoke(); }, 60e3);
 }
 function markKarCur(instant = false) {
   $$('#kList .kline').forEach(r => { const i = +r.dataset.i; r.classList.toggle('on', i === S.cur); r.classList.toggle('past', i < S.cur); });
@@ -2025,7 +2068,7 @@ function sheetSettings() {
 
     <div class="grouplabel">Biblioteca</div>
     <div class="group">
-      <button class="grow" data-a="export">${icon('share')}<span>Copiar backup<small>Músicas, letras, playlists e frases</small></span></button>
+      <button class="grow" data-a="export">${icon('share')}<span>Copiar backup<small>Músicas, letras, traduções, playlists e frases</small></span></button>
       <button class="grow" data-a="import">${icon('text')}<span>Restaurar backup<small>Mescla com o que já existe</small></span></button>
     </div>
     <textarea id="ioBox" rows="4" class="hidden" placeholder="Cole aqui o backup e toque em Restaurar backup"></textarea>
@@ -2034,7 +2077,7 @@ function sheetSettings() {
     <p class="caption center-text">Versa · por Sóstenes Rondena</p>`, {
     offm: () => nudge(-0.2), offp: () => nudge(0.2),
     export: async () => {
-      const txt = JSON.stringify(lib); const box = $('#ioBox'); box.classList.remove('hidden'); box.value = txt; box.select();
+      const txt = JSON.stringify({ ...lib, trCache }); const box = $('#ioBox');   // translations travel with the backup too box.classList.remove('hidden'); box.value = txt; box.select();
       try { await navigator.clipboard.writeText(txt); toast('Backup copiado ✓'); } catch { toast('Selecione e copie o texto'); }
     },
     import: () => {
@@ -2105,6 +2148,7 @@ function nudge(d) {
 }
 function importLib(data) {
   if (!data || !data.videos) throw new Error('bad');
+  if (data.trCache) { for (const [k, v] of Object.entries(data.trCache)) if (!trCache[k]) trCache[k] = v; store.set('lg:tr', trCache); }
   for (const [id, v] of Object.entries(data.videos)) {
     const cur = lib.videos[id];
     if (!cur) lib.videos[id] = v;
