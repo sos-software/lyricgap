@@ -17,7 +17,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<!-- VERSION: change ?v= on both lines below to publish a new version (MAJOR.MINOR.PATCH, see CHANGELOG.md) -->
+<link rel="stylesheet" href="style.css?v=1.0.0">
 </head>
 <body data-view="home">
 
@@ -249,7 +250,8 @@
   <div class="sheet-body"><div class="grabber"></div><div id="sheetContent"></div></div>
 </div>
 <div id="toast" class="toast"></div>
+<div id="updateBar" class="updatebar hidden" role="status"><span id="updateTxt"></span><button id="updateBtn" type="button">Atualizar</button></div>
 
-<script src="app.js"></script>
+<script src="app.js?v=1.0.0"></script>
 </body>
 </html>

@@ -581,3 +581,10 @@ body.playing #song{padding-top:var(--st)}
 .prevpill:active{color:var(--text)}
 .suggesthead .flag{font-size:18px;line-height:1}
 .ainote .terms,.songtr .sn .terms{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
+
+/* new version available */
+.updatebar{position:fixed;left:50%;bottom:calc(var(--sb) + var(--tabh) + 14px);transform:translateX(-50%);z-index:55;display:flex;align-items:center;gap:12px;
+  max-width:calc(100vw - 32px);padding:8px 8px 8px 16px;border-radius:999px;background:var(--text);color:var(--bg);font-size:14px;font-weight:600;box-shadow:0 10px 30px rgba(0,0,0,.4);white-space:nowrap}
+.updatebar button{background:var(--bg);color:var(--text);border-radius:999px;padding:8px 14px;font-weight:700;font-size:13.5px}
+.updatebar span{overflow:hidden;text-overflow:ellipsis}
+body.playing .updatebar,body[data-view=song] .updatebar{display:none}

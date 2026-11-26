@@ -22,6 +22,35 @@ const uid = () => Math.random().toString(36).slice(2, 9);
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 2200); }
 const icon = (name, cls = '') => `<svg class="${cls}"><use href="#i-${name}"/></svg>`;
 
+/* ================= version ================= */
+/* Semantic version MAJOR.MINOR.PATCH. The only place it is written is the ?v= on the <script> and stylesheet tags
+   in index.html: bumping it there also makes browsers fetch the new app.js/style.css instead of a cached copy.
+   The app compares its own version with the one in the published index.html and offers "Atualizar". */
+const APP_VERSION = (() => { try { return new URL(document.currentScript.src).searchParams.get('v') || 'dev'; } catch { return 'dev'; } })();
+function cmpVersion(a, b) {
+  const p = s => String(s).split('.').map(n => parseInt(n, 10) || 0);
+  const x = p(a), y = p(b);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0);
+  return 0;
+}
+let latestVersion = null, lastVersionCheck = 0;
+async function checkForUpdate(force = false) {
+  if (APP_VERSION === 'dev') return null;
+  if (!force && Date.now() - lastVersionCheck < 60000) return latestVersion;
+  lastVersionCheck = Date.now();
+  try {
+    const html = await (await fetch('./index.html?nc=' + Date.now(), { cache: 'no-store' })).text();
+    const m = html.match(/app\.js\?v=([\w.-]+)/);
+    if (m) latestVersion = m[1];
+  } catch { return null; }
+  const newer = latestVersion && cmpVersion(latestVersion, APP_VERSION) > 0;
+  $('#updateTxt').textContent = newer ? `Nova versão ${latestVersion} disponível` : '';
+  $('#updateBar').classList.toggle('hidden', !newer);
+  return latestVersion;
+}
+/* a new address makes the browser load index.html again, which then asks for app.js?v=<new> */
+function updateApp() { location.replace(location.pathname + '?u=' + Date.now()); }
+
 /* ================= settings & library ================= */
 const settings = Object.assign(
   { pace: 'pause', difficulty: 'medio', mode: 'choice', speed: 1, translate: true, lang: 'en', autoReplay: 8, sounds: true, ytKey: '', pipedOk: '', goal: 20, musicOnly: true, karTr: 'side', claudeKey: '', aiModel: 'claude-haiku-5-5', showPrev: true },
@@ -2124,10 +2153,14 @@ function sheetSettings() {
     <textarea id="ioBox" rows="4" class="hidden" placeholder="Cole aqui o backup e toque em Restaurar backup"></textarea>
 
     <button class="btn primary wide" data-a="done">Concluído</button>
+    <div class="grouplabel">Sobre</div>
+    <div class="group"><button class="grow" data-a="ver">${icon('sync')}<span>Versão ${esc(APP_VERSION)}<small id="verStatus">Procurando atualização…</small></span></button></div>
     <p class="caption center-text">Versa · por Sóstenes Rondena</p>`, {
+    ver: () => { if (latestVersion && cmpVersion(latestVersion, APP_VERSION) > 0) updateApp(); else paintVerStatus(true); },
     offm: () => nudge(-0.2), offp: () => nudge(0.2),
     export: async () => {
-      const txt = JSON.stringify({ ...lib, trCache }); const box = $('#ioBox');   // translations travel with the backup too box.classList.remove('hidden'); box.value = txt; box.select();
+      const txt = JSON.stringify({ ...lib, trCache }); const box = $('#ioBox');   // translations travel with the backup too
+      box.classList.remove('hidden'); box.value = txt; box.select();
       try { await navigator.clipboard.writeText(txt); toast('Backup copiado ✓'); } catch { toast('Selecione e copie o texto'); }
     },
     import: () => {
@@ -2139,8 +2172,20 @@ function sheetSettings() {
   });
   $$('#sheetContent [data-seg]').forEach(g => g.querySelectorAll('button').forEach(b => b.onclick = () => applySetting(g.dataset.seg, b.dataset.v, g)));
   $$('#sheetContent [data-t]').forEach(b => b.onclick = () => { const k = b.dataset.t; settings[k] = !settings[k]; saveSettings(); b.classList.toggle('on', settings[k]); if (S.phase === 'play') renderGame(); });
+  paintVerStatus(true);
   $('#ytKey').addEventListener('change', e => { settings.ytKey = e.target.value.trim(); saveSettings(); });
   $('#claudeKey').addEventListener('change', e => { settings.claudeKey = e.target.value.trim(); saveSettings(); });
+}
+async function paintVerStatus(force) {
+  const el = () => $('#verStatus');
+  if (!el()) return;
+  if (APP_VERSION === 'dev') { el().textContent = 'Versão de desenvolvimento'; return; }
+  el().textContent = 'Procurando atualização…';
+  const latest = await checkForUpdate(force);
+  if (!el()) return;
+  el().textContent = !latest ? 'Sem conexão para conferir agora. Toque para tentar de novo.'
+    : cmpVersion(latest, APP_VERSION) > 0 ? `Nova versão ${latest} disponível. Toque para atualizar.`
+    : 'Você está na versão mais recente.';
 }
 function applySetting(k, v, group) {
   if (['autoReplay', 'speed'].includes(k)) v = +v;
@@ -2351,8 +2396,18 @@ document.addEventListener('keydown', e => {
 });
 
 /* ================= init ================= */
+$('#updateBtn').onclick = updateApp;
+// iOS keeps a home-screen app suspended and resumes it instead of reloading: check again when it comes back
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkForUpdate(); });
+
 (function init() {
-  const q = new URLSearchParams(location.search).get('v');
+  const params = new URLSearchParams(location.search);
+  if (params.has('u')) history.replaceState(null, '', location.pathname);   // left by updateApp()
+  const seen = store.get('lg:version', null);
+  if (seen && seen !== APP_VERSION && APP_VERSION !== 'dev') setTimeout(() => toast(`Versa atualizado para a versão ${APP_VERSION}`), 800);
+  if (APP_VERSION !== 'dev') store.set('lg:version', APP_VERSION);
+  setTimeout(() => checkForUpdate(true), 3000);
+  const q = params.get('v');
   renderHome();
   const id = parseVideoId(q || '');
   if (id) openSong(id, null);

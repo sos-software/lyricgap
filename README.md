@@ -17,6 +17,7 @@ Jogo para aprender idiomas completando a letra de músicas do YouTube. A música
 - [Progresso: contadores, meta diária e heatmap](#progresso-contadores-meta-diária-e-heatmap)
 - [De onde vêm a letra, a tradução e a busca](#de-onde-vêm-a-letra-a-tradução-e-a-busca)
 - [Usar no iPhone (tela cheia)](#usar-no-iphone-tela-cheia)
+- [Versões e atualização](#versões-e-atualização)
 - [Anúncios e YouTube Premium](#anúncios-e-youtube-premium)
 - [Backup e troca de aparelho](#backup-e-troca-de-aparelho)
 - [Configurações](#configurações)
@@ -240,6 +241,25 @@ Durante o jogo a tela não apaga (iOS 16.4 ou mais novo).
 
 > ⚠️ O app da Tela de Início **guarda os dados separado do Safari**. Para levar músicas e frases de um para o outro, use o [backup](#backup-e-troca-de-aparelho).
 
+## Versões e atualização
+
+O app usa **versionamento semântico** (MAIOR.MENOR.CORREÇÃO, ex.: 1.0.0). O histórico fica no [CHANGELOG.md](CHANGELOG.md).
+
+**No celular:**
+
+- A versão instalada aparece em ⚙ → **Sobre** (ex.: *Versão 1.0.0 · Você está na versão mais recente*).
+- O app confere sozinho se saiu versão nova: ao abrir e sempre que volta para a tela. Quando sai, aparece a barra **Nova versão 1.1.0 disponível · Atualizar**. Um toque carrega a versão nova e o app mostra *Versa atualizado para a versão 1.1.0*.
+- **Não precisa apagar nem adicionar o ícone de novo.** Apagar o ícone da Tela de Início apaga também os dados guardados nele (músicas, frases, progresso) se não houver backup.
+
+**Para publicar uma versão nova (desenvolvedor):**
+
+1. Escolha o número: correção → 1.0.**1**, recurso novo → 1.**1**.0, mudança grande → **2**.0.0.
+2. No `index.html`, troque o `?v=` nas duas linhas marcadas com `VERSION` (`style.css?v=…` e `app.js?v=…`). É o único lugar onde o número fica escrito: o app lê a própria versão dali, e o número novo no endereço faz o navegador baixar os arquivos novos em vez de usar a cópia guardada.
+3. Acrescente a versão no topo do `CHANGELOG.md`.
+4. Faça o commit e o `git push`. Opcional: marque a versão com `git tag v1.1.0` e `git push --tags`.
+
+Mudanças que não trocam o `?v=` continuam chegando ao app, mas sem aviso, e só depois que o cache de até 10 minutos do GitHub Pages expira.
+
 ## Anúncios e YouTube Premium
 
 - O app **não remove anúncios**: o vídeo toca no player oficial, e cortar os anúncios dele vai contra as regras do YouTube.
@@ -284,7 +304,7 @@ node server.js
 
 > O player do YouTube não funciona abrindo o `index.html` direto como arquivo (`file://`). Use o servidor.
 
-**Publicação:** o site é servido pelo GitHub Pages a partir da branch `main`. Basta fazer `git push`, e ele atualiza em cerca de 1 minuto.
+**Publicação:** o site é servido pelo GitHub Pages a partir da branch `main`. Basta fazer `git push`, e ele atualiza em cerca de 1 minuto. Para o celular avisar e atualizar, troque a versão antes (veja [Versões e atualização](#versões-e-atualização)).
 
 ## Estrutura do código
 
