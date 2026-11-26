@@ -6,12 +6,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="sosLyricGap">
+<meta name="apple-mobile-web-app-title" content="Versa">
 <meta name="theme-color" content="#0b0b14">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" href="icons/icon-192.png">
-<title>sosLyricGap</title>
+<title>Versa</title>
 <meta name="author" content="Sóstenes Rondena">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -56,7 +56,7 @@
 <!-- ================= HOME (tabs) ================= -->
 <section id="home" class="view">
   <header class="apphead">
-    <div class="logo" id="homeLogo"><span class="mark">♪</span><span class="lname"><span class="sos">sos</span>Lyric<span class="grad">Gap</span></span></div>
+    <div class="logo" id="homeLogo"><span class="mark">♪</span><span class="lname">Vers<span class="grad">a</span></span></div>
     <h1 id="headTitle" class="hidden"></h1>
     <button class="iconbtn" id="btnSettings" aria-label="Configurações"><svg><use href="#i-gear"/></svg></button>
   </header>
@@ -108,7 +108,7 @@
   <!-- lyrics source -->
   <div id="pLyrics" class="pane">
     <div class="card">
-      <div class="cardhead"><span class="ico"><svg><use href="#i-text"/></svg></span><div><b>Letra da música</b><small>Precisamos da letra sincronizada para jogar</small></div></div>
+      <div class="cardhead"><span class="ico"><svg><use href="#i-text"/></svg></span><div><b>Letra da música</b><small>Escolha a versão da letra para começar</small></div></div>
       <div class="seg small" id="lyrTabs"><button data-tab="search" class="on">Buscar</button><button data-tab="paste">Colar letra</button></div>
       <div id="lyrSearch">
         <div class="row2"><input id="qTrack" placeholder="Música"><input id="qArtist" placeholder="Artista"></div>
@@ -116,7 +116,7 @@
         <div id="lrcResults" class="list"></div>
       </div>
       <div id="lyrPaste" class="hidden">
-        <p class="caption">Cole a letra com uma frase por linha. Em seguida você marca o tempo de cada frase no ritmo da música (só uma vez). Também aceita o formato LRC.</p>
+        <p class="caption">Cole a letra com uma frase por linha. Depois você marca o ritmo de cada frase uma única vez, ouvindo a música.</p>
         <textarea id="pasteBox" rows="8" placeholder="Cole a letra aqui…"></textarea>
         <button id="pasteBtn" class="btn primary wide">Continuar</button>
       </div>
@@ -138,7 +138,7 @@
         <button class="ctrl" id="sPlay"><svg><use href="#i-play"/></svg><span>Play</span></button>
       </div>
       <div class="chips center-row">
-        <button class="chip" id="sGap">Fim de frase (solo)</button>
+        <button class="chip" id="sGap">Marcar fim (instrumental)</button>
         <button class="chip" id="sSpeed">1x</button>
         <button class="chip" id="sCancel">Cancelar</button>
       </div>
@@ -165,7 +165,7 @@
       <button class="cta alt" id="karBtn"><svg><use href="#i-mic"/></svg>Karaokê</button>
     </div>
     <p class="caption center-text">Karaokê: a letra rola junto com a música, com a tradução ao lado. Sem lacunas e sem pontos.</p>
-    <button class="btn tonal wide" id="explainBtn">✨ Entender a música (IA)</button>
+    <button class="btn tonal wide" id="explainBtn">✨ Entender a música</button>
   </div>
 
   <!-- karaoke -->

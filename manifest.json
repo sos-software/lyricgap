@@ -1,7 +1,7 @@
 {
-  "name": "sosLyricGap",
-  "short_name": "sosLyricGap",
-  "description": "Aprenda idiomas completando letras de músicas do YouTube",
+  "name": "Versa",
+  "short_name": "Versa",
+  "description": "Aprenda idiomas verso a verso",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

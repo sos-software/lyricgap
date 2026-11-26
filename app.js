@@ -1,5 +1,5 @@
 'use strict';
-/* sosLyricGap (Sóstenes Rondena) — complete song lyrics while the YouTube video plays. */
+/* Versa (Sóstenes Rondena): complete song lyrics while the YouTube video plays. */
 
 /* ================= utils ================= */
 const $ = s => document.querySelector(s);
@@ -341,7 +341,7 @@ function renderSearchTab() {
 const lyricCheck = new Map();   // videoId -> 'synced' | 'plain' | 'none' | 'loading'
 function paintLyricBadge(b, st) {
   b.className = 'lb';
-  b.innerHTML = st === 'synced' ? '<span class="badge">LETRA ✓</span>' : st === 'plain' ? '<span class="badge warn">SÓ TEXTO</span>'
+  b.innerHTML = st === 'synced' ? '<span class="badge">COM LETRA</span>' : st === 'plain' ? '<span class="badge warn">LETRA SIMPLES</span>'
     : st === 'none' ? '<span class="badge muted">SEM LETRA</span>' : '';
 }
 let lyricCheckPausedUntil = 0;
@@ -569,7 +569,7 @@ async function ytSearch(q) {
     if (music) p.videoCategoryId = '10';   // YouTube category "Music"
     const r = await fetchT('https://www.googleapis.com/youtube/v3/search?' + new URLSearchParams(p));
     const j = await r.json();
-    if (j.error) throw new Error('API do YouTube: ' + j.error.message);
+    if (j.error) throw new Error('Não foi possível buscar agora. Tente de novo em instantes.');
     return j.items.map(it => ({ id: it.id.videoId, title: decode(it.snippet.title), author: decode(it.snippet.channelTitle) }));
   }
   const order = [settings.pipedOk, ...PIPED.filter(x => x !== settings.pipedOk)].filter(Boolean);
@@ -607,7 +607,7 @@ async function doSearch(q) {
   try { H.results = await ytSearch(q); }
   catch (e) {
     H.results = { error: e.message === 'offline'
-      ? 'Os servidores gratuitos de busca não responderam agora 😕<br><br>Opções: cole o link do vídeo aqui na busca, ou coloque uma <b>chave da API do YouTube</b> (grátis) em ⚙ Configurações para uma busca sempre funcionando.'
+      ? 'A busca não está respondendo agora. Tente de novo em instantes ou cole o link do vídeo na busca.'
       : esc(e.message) };
   }
   if (H.query === q) renderHome();
@@ -633,7 +633,7 @@ function createPlayer(id) {
         $('#sPlay').innerHTML = icon(playing ? 'pause' : 'play') + `<span>${playing ? 'Pausa' : 'Play'}</span>`;
       },
       onError: e => {
-        const msg = (e.data === 101 || e.data === 150) ? 'Esse vídeo não pode ser tocado fora do YouTube. Tente outra versão (ex.: "lyrics" ou "audio").' : 'Erro no player do YouTube (' + e.data + ').';
+        const msg = (e.data === 101 || e.data === 150) ? 'Este vídeo não pode ser reproduzido no app. Tente outra versão da música.' : 'Não foi possível reproduzir este vídeo agora.';
         toast(msg);
       }
     }
@@ -702,7 +702,7 @@ async function searchLyrics() {
   const lrclib = async params => {
     for (let attempt = 0; attempt < 3; attempt++) {
       const r = await fetchT('https://lrclib.net/api/search?' + new URLSearchParams(params), 10000);
-      if (r.status === 429) { box.innerHTML = '<p class="muted" style="text-align:center">Banco de letras ocupado, tentando de novo…</p>'; await wait(2000 * (attempt + 1)); continue; }
+      if (r.status === 429) { box.innerHTML = '<p class="muted" style="text-align:center">Buscando letra…</p>'; await wait(2000 * (attempt + 1)); continue; }
       const j = await r.json();
       return Array.isArray(j) ? j : [];
     }
@@ -719,7 +719,7 @@ async function searchLyrics() {
     res = res.filter(r => r.syncedLyrics || r.plainLyrics)
       .sort((a, b) => ((!!b.syncedLyrics) - (!!a.syncedLyrics)) || (gap(a) - gap(b))).slice(0, 8);
     if (!res.length) {
-      box.innerHTML = '<div class="notfound"><b>Letra não encontrada</b><span>Essa música ainda não está no banco de letras. Cole a letra de qualquer site e sincronize uma vez. Fica salvo para sempre.</span><button class="btn primary wide" id="goPaste">Colar letra</button></div>';
+      box.innerHTML = '<div class="notfound"><b>Letra não encontrada</b><span>Ainda não temos a letra desta música. Cole a letra e marque o ritmo uma única vez: ela fica salva para as próximas vezes.</span><button class="btn primary wide" id="goPaste">Colar letra</button></div>';
       $('#goPaste').onclick = () => $('#lyrTabs [data-tab=paste]').click();
       return;
     }
@@ -728,7 +728,7 @@ async function searchLyrics() {
     res.forEach(r => {
       const b = document.createElement('div'); b.className = 'item';
       const diff = vd && r.duration ? Math.abs(vd - r.duration) : 0;
-      b.innerHTML = `<div class="meta"><b>${esc(r.trackName)} — ${esc(r.artistName)}</b><small>${r.syncedLyrics ? '<span class="badge">SINCRONIZADA</span>' : 'só texto · você sincroniza'}${r.syncedLyrics && vd && r.duration && diff <= 2 ? '<span class="badge">MESMA DURAÇÃO</span>' : ''}${r.duration ? ' · ' + fmtDur(r.duration) : ''}${diff > 4 ? ` · ⚠ ${Math.round(diff)}s de diferença do vídeo` : ''}</small></div>`;
+      b.innerHTML = `<div class="meta"><b>${esc(r.trackName)} · ${esc(r.artistName)}</b><small>${r.syncedLyrics && vd && r.duration && diff <= 2 ? '<span class="badge">RECOMENDADA</span>' : r.syncedLyrics ? '<span class="badge">PRONTA</span>' : 'sem os tempos · você marca o ritmo'}${r.duration ? ' · ' + fmtDur(r.duration) : ''}${diff > 4 ? ' · versão diferente do vídeo' : ''}</small></div>`;
       b.onclick = () => {
         if (!r.syncedLyrics) return startSync(plainLines(r.plainLyrics));
         // a different duration usually means a clip intro / live / edited version: suggest the quick sync
@@ -738,7 +738,7 @@ async function searchLyrics() {
       box.appendChild(b);
     });
   } catch (e) {
-    box.innerHTML = `<div class="notfound"><b>${e.message === 'busy' ? 'Banco de letras ocupado' : 'Não consegui buscar a letra'}</b><span>${e.message === 'busy' ? 'Muitas buscas seguidas. Espere alguns segundos e tente de novo.' : 'Verifique a internet e tente de novo, ou cole a letra.'}</span><button class="btn primary wide" id="retryLrc">Tentar de novo</button></div>`;
+    box.innerHTML = `<div class="notfound"><b>Não foi possível buscar a letra agora</b><span>${e.message === 'busy' ? 'Muitas buscas seguidas. Espere alguns segundos e tente de novo.' : 'Verifique a internet e tente de novo, ou cole a letra.'}</span><button class="btn primary wide" id="retryLrc">Tentar de novo</button></div>`;
     $('#retryLrc').onclick = searchLyrics;
   }
 }
@@ -761,7 +761,7 @@ function renderReady() {
   mark('#rdPace', settings.pace); mark('#rdMode', settings.mode); mark('#rdDiff', settings.difficulty);
   const hint = $('#syncHint');
   if (S.v && S.v.syncHint) {
-    hint.innerHTML = `<div class="synchint"><b>⚠ A letra pode estar fora de tempo</b><span>Ela tem ${S.v.syncHint}s de diferença da duração do vídeo (introdução do clipe, versão ao vivo…). Acerte com 1 ou 2 toques.</span>
+    hint.innerHTML = `<div class="synchint"><b>A letra pode estar fora do ritmo</b><span>Ela é de uma versão um pouco diferente deste vídeo. Se o texto aparecer adiantado ou atrasado, acerte com um ou dois toques.</span>
       <div class="sheetbtns"><button class="btn primary" id="qsGo">⚡ Sincronia rápida</button><button class="btn" id="qsDismiss">Está certa</button></div></div>`;
     $('#qsGo').onclick = sheetQuickSync;
     $('#qsDismiss').onclick = () => { delete S.v.syncHint; saveLib(); renderReady(); };
@@ -790,12 +790,12 @@ function sheetQuickSync() {
     let a = 1;
     if (t2 != null) {
       const k = (t2 - t1) / (later.t - first.t);
-      if (k > 0.8 && k < 1.25) a = k; else toast('Segundo toque ignorado (longe demais do esperado)');
+      if (k > 0.8 && k < 1.25) a = k; else toast('O segundo toque ficou fora do esperado e não foi usado');
     }
     S.entries = S.entries.map(e => ({ ...e, t: Math.max(0, +(a * (e.t - first.t) + t1).toFixed(2)) }));
     S.offset = 0; delete S.v.syncHint;
     saveSong(); closeSheet(); stop(); renderReady();
-    toast(a !== 1 ? `⚡ Sincronizado (início e velocidade ${Math.round(a * 100)}%)` : '⚡ Letra sincronizada');
+    toast(a !== 1 ? 'Letra sincronizada e velocidade ajustada' : 'Letra sincronizada');
   };
   const render = () => {
     const ln = step === 1 ? first : later;
@@ -1244,7 +1244,7 @@ function submitAnswer(value) {
     if (settings.mode === 'choice') b.removed.add(norm(value));
     if (b.attempts >= 3) {
       missBlank(b);
-      setStatus(`Era “${b.answer}” — ouça de novo`, 'bad');
+      setStatus(`A palavra era “${b.answer}”. Ouça de novo`, 'bad');
       $('#answer').value = '';
       if (!hasUnsolved(line)) translateLine(line);
       replayLine();
@@ -1394,7 +1394,7 @@ function setTranslation(text, lang, tr, mine) {
    (never in the code, the repo or the library backup) and requests go straight from the browser to Anthropic.
    Official TypeScript SDK, loaded from the CDN on first use (pinned version). */
 const SDK_URL = 'https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@1.8.0/+esm';
-const AI_MODELS = [['claude-haiku-5-5', 'Haiku 5.5 · rápido e barato'], ['claude-sonnet-5-5', 'Sonnet 5.5 · mais caprichado']];
+const AI_MODELS = [['claude-haiku-5-5', 'Rápido'], ['claude-sonnet-5-5', 'Detalhado']];
 let AnthropicSDK = null, aiClient = null, aiClientKey = '';
 lib.aiNotes = lib.aiNotes || {};   // verse key -> short note about slang/idioms from the AI translation
 async function getAI() {
@@ -1408,17 +1408,17 @@ async function getAI() {
 }
 function aiErrorText(e) {
   const A = AnthropicSDK;
-  if (e && e.code === 'nokey') return 'Coloque sua chave da Claude em ⚙ Configurações → Inteligência artificial.';
-  if (e && e.code === 'refusal') return 'A IA não quis responder este pedido.';
+  if (e && e.code === 'nokey') return 'Ative a tradução inteligente em ⚙ Configurações.';
+  if (e && e.code === 'refusal') return 'Não foi possível gerar uma resposta para este trecho.';
   if (A) {   // most specific first; APIConnectionError is a subclass of APIError in the TS SDK
-    if (e instanceof A.AuthenticationError) return 'Chave inválida. Confira a chave em ⚙ Configurações.';
-    if (e instanceof A.PermissionDeniedError) return 'Essa chave não tem permissão para usar este modelo.';
-    if (e instanceof A.NotFoundError) return 'Modelo não disponível para esta chave. Troque o modelo em ⚙ Configurações.';
-    if (e instanceof A.RateLimitError) return 'Limite de uso da chave atingido. Espere um pouco e tente de novo.';
-    if (e instanceof A.APIConnectionError) return 'Sem conexão com a Anthropic. Verifique a internet.';
-    if (e instanceof A.APIError) return `Erro da API da Claude (${e.status || '?'}). Tente de novo.`;
+    if (e instanceof A.AuthenticationError) return 'Chave de acesso inválida. Confira em ⚙ Configurações.';
+    if (e instanceof A.PermissionDeniedError) return 'Esta chave não tem acesso a este recurso.';
+    if (e instanceof A.NotFoundError) return 'Modo indisponível para esta chave. Troque o modo em ⚙ Configurações.';
+    if (e instanceof A.RateLimitError) return 'Limite de uso atingido. Tente de novo daqui a pouco.';
+    if (e instanceof A.APIConnectionError) return 'Sem conexão. Verifique a internet.';
+    if (e instanceof A.APIError) return 'Não foi possível concluir agora. Tente de novo em instantes.';
   }
-  return 'Não foi possível usar a IA agora (' + (e && e.message || 'erro') + ').';
+  return 'Não foi possível concluir agora. Tente de novo em instantes.';
 }
 const LANG_NAME = { en: 'inglês', es: 'espanhol', fr: 'francês', it: 'italiano', de: 'alemão', pt: 'português' };
 const songContext = () => {
@@ -1449,10 +1449,10 @@ async function aiTranslateVerse(text) {
 }
 
 /* ✨ button next to every translation: translate this verse with Claude, save it, show the note */
-const trAiBtn = attrs => `<button class="trai" ${attrs} title="Traduzir com IA" aria-label="Traduzir com IA">✨</button>`;
+const trAiBtn = attrs => `<button class="trai" ${attrs} title="Tradução inteligente" aria-label="Tradução inteligente">✨</button>`;
 function sheetNoKey(after) {
-  openSheet(`<h3>✨ Tradução com IA</h3>
-    <p class="caption center-text" style="margin-top:0">Para usar a IA, cole aqui a sua chave da API da Claude (Anthropic). Ela fica salva só neste aparelho.</p>
+  openSheet(`<h3>✨ Tradução inteligente</h3>
+    <p class="caption center-text" style="margin-top:0">A tradução inteligente usa a Claude. Cole sua chave de acesso para ativar; ela fica guardada só neste aparelho.</p>
     <input id="aiKeyQuick" type="password" placeholder="sk-ant-…" autocapitalize="off" autocorrect="off" spellcheck="false">
     <button class="btn primary wide" data-a="save">Salvar e continuar</button>
     <button class="btn wide" data-a="cancel">Agora não</button>`, {
@@ -1467,9 +1467,9 @@ function sheetAiTr(text, lang, after) {
   const wasPlaying = inSession() && playerReady && player.getPlayerState() === YT.PlayerState.PLAYING;
   if (wasPlaying) player.pauseVideo();
   const finish = () => { closeSheet(); if (wasPlaying) player.playVideo(); if (after) after(); };
-  openSheet(`<h3>✨ Tradução com IA</h3>
+  openSheet(`<h3>✨ Tradução inteligente</h3>
     <div class="adjline">${esc(text)}</div>
-    <div id="aiTrBox" class="aibox"><span class="trwait">A IA está traduzindo este verso…</span></div>
+    <div id="aiTrBox" class="aibox"><span class="trwait">Traduzindo o verso…</span></div>
     <div class="sheetbtns"><button class="btn" data-a="undo" id="aiUndo" disabled>Desfazer</button><button class="btn primary" data-a="ok">OK</button></div>`, {
     ok: finish,
     undo: () => { if (before) setTranslation(text, lang, before, true); else setTranslation(text, lang, trCache[key] || null, false); delete lib.aiNotes[key]; saveLib(); toast('Tradução anterior de volta'); finish(); }
@@ -1523,9 +1523,9 @@ function sheetExplain(force = false) {
   const cached = !force && v.explain;
   openSheet(`<h3>✨ Entender a música</h3>
     <p class="caption center-text" style="margin-top:0">${esc(v.title || '')}${v.author ? ' · ' + esc(v.author) : ''}</p>
-    <div id="explainBox" class="explain">${cached ? mdLite(v.explain) : '<span class="trwait">A IA está lendo a letra…</span>'}</div>
+    <div id="explainBox" class="explain">${cached ? mdLite(v.explain) : '<span class="trwait">Lendo a letra…</span>'}</div>
     <div class="sheetbtns"><button class="btn" data-a="again" id="exAgain" ${cached ? '' : 'disabled'}>Gerar de novo</button><button class="btn primary" data-a="ok">Fechar</button></div>
-    <p class="caption center-text">Gerado por IA (${esc((AI_MODELS.find(m => m[0] === settings.aiModel) || [settings.aiModel])[0])}). Pode conter erros.</p>`, {
+    <p class="caption center-text">Explicação gerada automaticamente. Pode conter imprecisões.</p>`, {
     ok: () => { explainRun++; closeSheet(); if (wasPlaying) player.playVideo(); },
     again: () => { explainRun++; sheetExplain(true); }
   }, () => { explainRun++; if (wasPlaying) player.playVideo(); });
@@ -1571,9 +1571,9 @@ function sheetFixTr(text, lang, after) {
   openSheet(`<h3>Tradução do verso</h3>
     <div class="adjline">${S.phase === 'play' && S.lines.some(l => l.text === text && hasUnsolved(l)) ? lineHTML(S.lines.find(l => l.text === text), false, false) : esc(text)}</div>
     <p class="caption center-text" style="margin-top:4px">Toque na tradução que faz mais sentido. Ela fica salva para este verso.</p>
-    ${choice('auto', 'Automática (MyMemory)', auto, 'sem tradução')}
-    ${choice('google', 'Google Tradutor', null, '<span class="trwait">buscando…</span>')}
-    <button class="tropt aiopt" data-a="ai"><small>✨ Inteligência artificial (Claude)</small><span>Traduzir com o contexto da música e explicar gírias</span></button>
+    ${choice('auto', 'Tradução automática', auto, 'sem tradução')}
+    ${choice('google', 'Tradução alternativa', null, '<span class="trwait">buscando…</span>')}
+    <button class="tropt aiopt" data-a="ai"><small>✨ Tradução inteligente</small><span>Considera a música inteira e explica gírias e expressões</span></button>
     <div class="tropt mine${mine && mine === cur ? ' on' : ''}"><small>Minha tradução${mine ? ' · em uso' : ''}</small>
       <textarea id="trMine" rows="2" placeholder="Escreva com suas palavras…">${esc(mine)}</textarea>
       <button class="btn primary wide" data-a="mine" style="margin-top:8px">Usar a minha</button></div>
@@ -1583,7 +1583,7 @@ function sheetFixTr(text, lang, after) {
       if (!tx) return;
       if (tx === cur && !(k === 'auto' && mine)) return done();
       setTranslation(text, lang, tx, k !== 'auto');
-      done(k === 'auto' ? 'Voltou para a tradução automática' : '✎ Tradução do Google salva');
+      done(k === 'auto' ? 'Voltou para a tradução automática' : 'Tradução salva');
     },
     mine: () => {
       const tx = $('#trMine').value.trim().replace(/\s+/g, ' ');
@@ -1598,10 +1598,10 @@ function sheetFixTr(text, lang, after) {
     google = tx;
     const el = $('#tro-google'); if (!el) return;
     const btn = el.closest('.tropt');
-    if (!tx) { el.textContent = 'não disponível agora'; return; }
+    if (!tx) { el.textContent = 'indisponível no momento'; return; }
     el.textContent = tx; btn.disabled = false;
-    if (tx === cur) { btn.classList.add('on'); btn.querySelector('small').textContent = 'Google Tradutor · em uso'; }
-  }).catch(() => { const el = $('#tro-google'); if (el) el.textContent = 'não disponível agora'; });
+    if (tx === cur) { btn.classList.add('on'); btn.querySelector('small').textContent = 'Tradução alternativa · em uso'; }
+  }).catch(() => { const el = $('#tro-google'); if (el) el.textContent = 'indisponível no momento'; });
 }
 
 /* ================= saved phrases ================= */
@@ -1679,7 +1679,7 @@ function showResults(completed) {
       <span>${newBest ? '🏆 <b>novo recorde!</b>' : `recorde <b>${S.v.best || '—'}</b>`}</span>
     </div>
     ${(() => { const t = todayStats(), lv = levelOf(xpOf(lib.stats)), sk = dayStreak(); return `<div class="todayline"><span>Hoje <b>${t.words}/${settings.goal}</b> palavras</span><span>🔥 <b>${sk}</b> dia${sk === 1 ? "" : "s"}</span><span>Nível <b>${lv.level}</b></span></div>`; })()}
-    ${missed.length ? `<p class="muted">Palavras para revisar · 🔖 salva a frase</p><ul class="missed">${missed.map(x => `<li><div><b>${esc(x.b.answer)}</b> — ${esc(x.l.text)}${x.l.tr ? `<div class="tr">${esc(x.l.tr)}</div>` : ''}</div>${bmBtn(!!findPhrase(S.videoId, x.l.text), `data-a="bm" data-i="${S.lines.indexOf(x.l)}" style="position:static;transform:none"`)}</li>`).join('')}</ul>` : played.length ? '<p class="muted" style="text-align:center">Nenhum erro! 🏆</p>' : ''}
+    ${missed.length ? `<p class="muted">Palavras para revisar · 🔖 salva a frase</p><ul class="missed">${missed.map(x => `<li><div><b>${esc(x.b.answer)}</b> · ${esc(x.l.text)}${x.l.tr ? `<div class="tr">${esc(x.l.tr)}</div>` : ''}</div>${bmBtn(!!findPhrase(S.videoId, x.l.text), `data-a="bm" data-i="${S.lines.indexOf(x.l)}" style="position:static;transform:none"`)}</li>`).join('')}</ul>` : played.length ? '<p class="muted" style="text-align:center">Nenhum erro! 🏆</p>' : ''}
     <div class="sheetbtns" style="flex-direction:column">
       ${hasNext ? '<button class="btn primary" data-a="next">Próxima música ▶</button>' : ''}
       <button class="btn ${hasNext ? '' : 'primary'}" data-a="again">Jogar de novo</button>
@@ -1812,14 +1812,14 @@ function sheetSettings() {
       ${swRow('Sons de acerto', 'sounds')}
     </div>
 
-    <div class="grouplabel">Inteligência artificial (Claude)</div>
-    <input id="claudeKey" type="password" placeholder="Chave da API da Claude (sk-ant-…)" value="${esc(settings.claudeKey)}" autocapitalize="off" autocorrect="off" spellcheck="false">
-    <div class="field"><label>Modelo</label>${seg('aiModel', AI_MODELS, settings.aiModel)}</div>
-    <p class="caption" style="margin-top:6px">Usada no ✨ ao lado das traduções e em <b>Entender a música</b>. A chave fica só neste aparelho (não vai no backup) e é enviada direto para a Anthropic. Dica: defina um limite de gastos para a chave no console da Anthropic.</p>
+    <div class="grouplabel">Tradução inteligente</div>
+    <input id="claudeKey" type="password" placeholder="Chave de acesso da Claude" value="${esc(settings.claudeKey)}" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div class="field"><label>Modo</label>${seg('aiModel', AI_MODELS, settings.aiModel)}</div>
+    <p class="caption" style="margin-top:6px">Ativa o ✨ ao lado das traduções e o <b>Entender a música</b>. A chave fica guardada só neste aparelho e não entra no backup. Recomendamos definir um limite de gastos para ela.</p>
 
-    <div class="grouplabel">Busca de vídeos</div>
-    <input id="ytKey" placeholder="Chave da API do YouTube (opcional)" value="${esc(settings.ytKey)}" autocapitalize="off" autocorrect="off" spellcheck="false">
-    <p class="caption" style="margin-top:6px">Sem chave, a busca usa servidores gratuitos que às vezes ficam fora do ar. Uma chave grátis (Google Cloud → YouTube Data API v3) deixa a busca estável.</p>
+    <div class="grouplabel">Avançado</div>
+    <input id="ytKey" placeholder="Chave do YouTube (opcional)" value="${esc(settings.ytKey)}" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <p class="caption" style="margin-top:6px">Opcional. Com uma chave própria do YouTube, a busca de vídeos fica mais estável.</p>
 
     <div class="grouplabel">Biblioteca</div>
     <div class="group">
@@ -1829,7 +1829,7 @@ function sheetSettings() {
     <textarea id="ioBox" rows="4" class="hidden" placeholder="Cole aqui o backup e toque em Restaurar backup"></textarea>
 
     <button class="btn primary wide" data-a="done">Concluído</button>
-    <p class="caption center-text">sosLyricGap · por Sóstenes Rondena<br>letras de LRCLIB · tradução por MyMemory e Google</p>`, {
+    <p class="caption center-text">Versa · por Sóstenes Rondena</p>`, {
     offm: () => nudge(-0.2), offp: () => nudge(0.2),
     export: async () => {
       const txt = JSON.stringify(lib); const box = $('#ioBox'); box.classList.remove('hidden'); box.value = txt; box.select();
@@ -1864,14 +1864,14 @@ function sheetSongMore() {
     <div class="group">
       <button class="grow" data-a="pl">${icon('addlist')}<span>Adicionar à playlist</span></button>
       <button class="grow" data-a="yt">${icon('ext')}<span>Abrir no YouTube</span></button>
-      ${has ? `<button class="grow" data-a="explain"><span class="aiico">✨</span><span>Entender a música<small>Explicação completa feita por IA</small></span></button>` : ''}
+      ${has ? `<button class="grow" data-a="explain"><span class="aiico">✨</span><span>Entender a música<small>Resumo, sentido e expressões da letra</small></span></button>` : ''}
     </div>
     <div class="grouplabel">Letra</div>
     <div class="group">
       ${has ? `<button class="grow" data-a="kar">${icon('note')}<span>Modo karaokê<small>A letra rola junto com a música, com tradução</small></span></button>
       <button class="grow" data-a="quick"><span class="aiico">⚡</span><span>Sincronia rápida<small>Letra fora de tempo? Acerte com 1 ou 2 toques</small></span></button>
       <button class="grow" data-a="resync">${icon('sync')}<span>Sincronizar de novo<small>Marcar o tempo de cada frase outra vez</small></span></button>
-      <button class="grow" data-a="edit">${icon('edit')}<span>Editar LRC<small>Corrigir texto ou tempos</small></span></button>` : ''}
+      <button class="grow" data-a="edit">${icon('edit')}<span>Editar letra<small>Corrigir o texto ou os tempos</small></span></button>` : ''}
       <button class="grow" data-a="change">${icon('text')}<span>${has ? 'Trocar letra' : 'Buscar ou colar letra'}</span></button>
     </div>`, {
     pl: () => sheetAddToPlaylist(v),
@@ -1885,11 +1885,11 @@ function sheetSongMore() {
   });
 }
 function sheetEditLRC() {
-  openSheet(`<h3>Editar LRC</h3><p class="caption" style="margin-top:0">Cada linha: <code>[mm:ss.cc]texto</code></p>
+  openSheet(`<h3>Editar letra</h3><p class="caption" style="margin-top:0">Cada linha começa com o tempo do verso, por exemplo <code>[01:23.45]</code>.</p>
     <textarea id="lrcBox" rows="12">${esc(toLRC(S.entries))}</textarea>
     <div class="sheetbtns"><button class="btn" data-a="copy">Copiar</button><button class="btn primary" data-a="save">Salvar</button></div>`, {
     copy: async () => { try { await navigator.clipboard.writeText($('#lrcBox').value); toast('Copiado ✓'); } catch { } },
-    save: () => { const e = parseLRC($('#lrcBox').value); if (!e) { toast('LRC inválido'); return; } S.entries = e; saveSong(); closeSheet(); if (S.phase === 'ready') renderReady(); toast('Salvo ✓'); }
+    save: () => { const e = parseLRC($('#lrcBox').value); if (!e) { toast('Formato inválido. Cada linha deve começar com o tempo, como [01:23.45]'); return; } S.entries = e; saveSong(); closeSheet(); if (S.phase === 'ready') renderReady(); toast('Salvo ✓'); }
   });
 }
 function nudge(d) {
