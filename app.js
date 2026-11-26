@@ -540,6 +540,28 @@ async function fetchT(url, ms = 7000) {
   const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
   try { return await fetch(url, { signal: c.signal }); } finally { clearTimeout(t); }
 }
+/* Order merged results by how well title + artist match what the user typed.
+   The "songs" and "music videos" lists are ranked separately by YouTube; simply concatenating them
+   can bury the original (e.g. "Aya Nakamura Copines": the original is only in the videos list). */
+const VARIANT = /\b(slowed|sped ?up|speed ?up|reverb|8d|nightcore|remix|mashup|cover|karaok[eê]|instrumental|bass ?boosted|tiktok|lofi|lo-fi|choreograph\w*|tutorial|piano version|guitar lesson)\b/i;
+const qTokens = s => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[^\p{L}\p{N}']+/u).filter(t => t.length >= 2);
+function rankByQuery(items, q) {
+  const qt = [...new Set(qTokens(q))];
+  if (!qt.length) return items;
+  const wantsVariant = VARIANT.test(q);
+  const scored = items.map(x => {
+    const tt = new Set(qTokens(x.title || '')), at = new Set(qTokens(x.author || ''));
+    const hits = qt.filter(t => tt.has(t) || at.has(t)).length;
+    let score = (hits / qt.length) * 10;
+    if (qt.some(t => at.has(t))) score += 2;                       // artist named in the query
+    if (!wantsVariant && VARIANT.test(x.title || '')) score -= 6;  // remixes, slowed, 8D… go down
+    if (x.src === 'song') score += 0.5;                            // album audio: timing matches the lyrics
+    if (x.views > 0) score += Math.log10(x.views) * 0.4;           // popular version wins ties (10k → 1.6, 100M → 3.2)
+    score -= x.rank * 0.05;                                        // keep YouTube's own order as tie-break
+    return { x, score };
+  });
+  return scored.sort((a, b) => b.score - a.score).map(s => { const { src, rank, ...rest } = s.x; return rest; });
+}
 async function ytSearch(q) {
   const music = settings.musicOnly;
   if (settings.ytKey) {
@@ -556,7 +578,7 @@ async function ytSearch(q) {
     if (!r.ok) throw new Error('http ' + r.status);
     const j = await r.json();
     return (j.items || []).filter(x => x.type === 'stream' && x.url && !x.isShort)
-      .map(x => ({ id: (x.url.match(/v=([\w-]{11})/) || [])[1], title: x.title, author: x.uploaderName, dur: x.duration }))
+      .map(x => ({ id: (x.url.match(/v=([\w-]{11})/) || [])[1], title: x.title, author: x.uploaderName, dur: x.duration, views: x.views }))
       .filter(x => x.id);
   };
   for (const base of order) {
@@ -566,7 +588,10 @@ async function ytSearch(q) {
         // YouTube Music: "songs" are the album audio (no clip intro, same timing as the lyrics), then official music videos
         const [songs, vids] = await Promise.all([pipedQuery(base, 'music_songs').catch(() => null), pipedQuery(base, 'music_videos').catch(() => null)]);
         if (!songs && !vids) continue;   // instance down
-        const seen = new Set(); items = [...(songs || []), ...(vids || [])].filter(x => !seen.has(x.id) && seen.add(x.id));
+        const seen = new Set();
+        const merged = [...(songs || []).map((x, i) => ({ ...x, src: 'song', rank: i })), ...(vids || []).map((x, i) => ({ ...x, src: 'video', rank: i }))]
+          .filter(x => !seen.has(x.id) && seen.add(x.id));
+        items = rankByQuery(merged, q);
       } else items = await pipedQuery(base, 'videos');
       if (items.length || music) { if (settings.pipedOk !== base) { settings.pipedOk = base; saveSettings(); } return items; }
     } catch { }
@@ -659,7 +684,9 @@ function guessTrack(title, author) {
   let track = title || '', artist = (author || '').replace(/\s*-\s*Topic$/i, '').replace(/VEVO$/i, '').trim();
   const m = track.match(/^(.+?)\s+[-–]\s+(.+)$/);
   if (m) { artist = m[1]; track = m[2]; }
-  track = track.replace(/[([](official|lyric|audio|video|clipe|hd|4k|visualizer|live|letra|legendado|tradu|ft\.?|feat)[^)\]]*[)\]]/gi, '').replace(/\s+/g, ' ').trim();
+  // drop "(Official Video)", "(Clip officiel)", "[Paroles]", "(Video oficial)", "(Testo)", "(Offizielles Musikvideo)"…
+  const tag = /[([][^)\]]*\b(official|officiel|officielle|oficial|ufficiale|offiziell\w*|lyrics?|paroles|letra|testo|songtext|audio|video|v[ií]deo|vid[ée]o|videoclip|clip|clipe|musikvideo|mv|m\/v|hd|4k|visuali[sz]er|live|ao vivo|en vivo|legendado|subtitulado|tradu\w*|ft\.?|feat\.?|prod\.?)\b[^)\]]*[)\]]/gi;
+  track = track.replace(tag, '').replace(/\s+(ft\.?|feat\.?)\s.*$/i, '').replace(/\s+/g, ' ').trim();
   return { track, artist };
 }
 function prefillLyrics() {
@@ -671,13 +698,21 @@ function prefillLyrics() {
 async function searchLyrics() {
   const track = $('#qTrack').value.trim(), artist = $('#qArtist').value.trim();
   const box = $('#lrcResults'); box.innerHTML = '<p class="muted" style="text-align:center">Buscando letra…</p>';
+  // LRCLIB answers 429 when it gets too many requests (e.g. right after the search badges); wait and retry instead of giving up
+  const lrclib = async params => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const r = await fetchT('https://lrclib.net/api/search?' + new URLSearchParams(params), 10000);
+      if (r.status === 429) { box.innerHTML = '<p class="muted" style="text-align:center">Banco de letras ocupado, tentando de novo…</p>'; await wait(2000 * (attempt + 1)); continue; }
+      const j = await r.json();
+      return Array.isArray(j) ? j : [];
+    }
+    throw new Error('busy');
+  };
   try {
     let res = [];
-    if (track) {
-      const p = new URLSearchParams({ track_name: track }); if (artist) p.set('artist_name', artist);
-      res = await (await fetchT('https://lrclib.net/api/search?' + p, 10000)).json();
-    }
-    if (!res.length) res = await (await fetchT('https://lrclib.net/api/search?' + new URLSearchParams({ q: `${track} ${artist}`.trim() }), 10000)).json();
+    if (track) res = await lrclib(artist ? { track_name: track, artist_name: artist } : { track_name: track });
+    if (!res.length) res = await lrclib({ q: `${track} ${artist}`.trim() });
+    if (!res.length && track) res = await lrclib({ q: track });
     res = res.filter(r => r.syncedLyrics || r.plainLyrics).sort((a, b) => (!!b.syncedLyrics) - (!!a.syncedLyrics)).slice(0, 8);
     if (!res.length) {
       box.innerHTML = '<div class="notfound"><b>Letra não encontrada</b><span>Essa música ainda não está no banco de letras. Cole a letra de qualquer site e sincronize uma vez. Fica salvo para sempre.</span><button class="btn primary wide" id="goPaste">Colar letra</button></div>';
@@ -694,7 +729,8 @@ async function searchLyrics() {
       box.appendChild(b);
     });
   } catch (e) {
-    box.innerHTML = '<p class="muted">Erro ao buscar a letra. Use a aba Colar.</p>';
+    box.innerHTML = `<div class="notfound"><b>${e.message === 'busy' ? 'Banco de letras ocupado' : 'Não consegui buscar a letra'}</b><span>${e.message === 'busy' ? 'Muitas buscas seguidas. Espere alguns segundos e tente de novo.' : 'Verifique a internet e tente de novo, ou cole a letra.'}</span><button class="btn primary wide" id="retryLrc">Tentar de novo</button></div>`;
+    $('#retryLrc').onclick = searchLyrics;
   }
 }
 function setEntries(entries, save) {

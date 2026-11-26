@@ -150,6 +150,8 @@ O Google só entra quando você pede uma tradução melhor (veja abaixo).
 
 - É um banco **gratuito e comunitário** de letras **sincronizadas** (cada frase com seu tempo). Voluntários enviam letras e tempos.
 - Músicas menos conhecidas podem não estar lá. Nesse caso, cole a letra de qualquer site e sincronize no app.
+- Antes de buscar, o app limpa o título do vídeo em vários idiomas: tira *(Official Video)*, *(Clip officiel)*, *[Paroles]*, *(Video oficial)*, *(Testo)*, *ft. …* etc. Se não achar pelo nome e artista, tenta só pelo nome.
+- Se o LRCLIB estiver ocupado (muitas buscas seguidas), o app espera e tenta de novo sozinho; se continuar ocupado, mostra o botão *Tentar de novo*.
 - Uma letra comunitária pode ter pequenos erros. Dá para corrigir em **Editar LRC** na tela antes de jogar.
 - O app não guarda nem distribui letras: elas são buscadas na hora, ou coladas por você, e ficam só no seu aparelho.
 
@@ -176,7 +178,7 @@ Toque na que faz mais sentido. Ela fica salva **para aquele verso** (e para toda
 
 ### Busca de vídeos
 
-- **Filtro Músicas / Todos os vídeos:** por padrão a busca traz só **músicas** (YouTube Music: primeiro o áudio oficial do álbum, que bate com o tempo das letras e não tem introdução de clipe, depois os clipes oficiais). Cada resultado ganha um selo do LRCLIB: **LETRA ✓** (sincronizada), **SÓ TEXTO** (você sincroniza) ou **SEM LETRA**. Para palestras e outros vídeos, escolha **Todos os vídeos**.
+- **Filtro Músicas / Todos os vídeos:** por padrão a busca traz só **músicas** (YouTube Music: áudios do álbum e clipes oficiais). Os resultados são **ordenados pelo que você digitou**: título e artista que batem com as suas palavras vêm primeiro, versões *slowed / 8D / remix / cover / tutorial* descem (a menos que você peça por elas) e o número de visualizações desempata, para a versão famosa aparecer antes. Cada resultado ganha um selo do LRCLIB: **LETRA ✓** (sincronizada), **SÓ TEXTO** (você sincroniza) ou **SEM LETRA**. Para palestras e outros vídeos, escolha **Todos os vídeos**.
 - **Sem configurar nada:** a busca usa servidores públicos do [Piped](https://github.com/TeamPiped/Piped), um front-end alternativo e aberto do YouTube. Eles são gratuitos, mas **às vezes ficam fora do ar**. O app tenta vários e lembra qual funcionou.
 - **Com uma chave da API do YouTube** (⚙ → *Busca de vídeos*): a busca usa a API oficial e fica estável. A chave é grátis no Google Cloud (YouTube Data API v3), com cerca de 100 buscas por dia, e fica salva só no seu aparelho.
 - **Sempre funciona:** colar o link do vídeo na caixa de busca.
