@@ -1,16 +1,20 @@
-/* ============ sosLyricGap — design tokens ============ */
+/* ============ Versa · design tokens (Palco) ============ */
 :root{
-  --bg:#09090f; --s1:#13131c; --s2:#1b1b27; --s3:#262634; --line:rgba(255,255,255,.07);
-  --text:#f4f4f8; --text2:#b9b9c9; --muted:#7c7c93;
-  --a1:#8b5cf6; --a2:#06b6d4; --grad:linear-gradient(135deg,#8b5cf6 0%,#6366f1 50%,#06b6d4 100%);
-  --c0:#8b5cf6; --c1:#06b6d4; --c2:#f43f5e; --c3:#f59e0b;
-  --ok:#22c55e; --bad:#f43f5e; --warn:#fbbf24;
+  --bg:#121015; --s1:#1c1920; --s2:#27232c; --s3:#332e39; --line:rgba(255,255,255,.06);
+  --text:#f6f1e9; --text2:#cbc4d3; --muted:#9a93a3;
+  --acc:#ffd84d; --acc-ink:#1a1500;              /* the one brand colour: highlighter yellow */
+  --a1:var(--acc); --a2:#8fe3cf;                 /* a2 = translations / info (mint) */
+  --grad:var(--acc);
+  --c0:#8b5cf6; --c1:#06b6d4; --c2:#f43f5e; --c3:#f59e0b;   /* answer pad: one colour per key */
+  --ok:#8be08f; --bad:#ff7b6b; --warn:#ffb547;
+  --font-ui:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  --font-display:"Bricolage Grotesque",Inter,-apple-system,"Segoe UI",sans-serif;
   --r:18px;
   --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px);
   --tabh:58px;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);-webkit-text-size-adjust:100%;-webkit-font-smoothing:antialiased}
 body{min-height:100dvh;overscroll-behavior-y:none}
 svg{width:22px;height:22px;display:block;flex:none}
 .hidden{display:none!important}
@@ -44,10 +48,10 @@ button:disabled{opacity:.3;pointer-events:none}
 .iconbtn.on{color:var(--warn)}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:14px;padding:13px 18px;font-size:15px;font-weight:600;background:var(--s2)}
 .btn.primary{background:var(--grad);color:#fff}
-.btn.tonal{background:rgba(139,92,246,.16);color:#c4b5fd}
+.btn.tonal{background:rgba(255,216,77,.16);color:var(--acc)}
 .btn.danger{background:rgba(244,63,94,.12);color:#fb7185}
 .btn.wide{width:100%;margin-top:12px}
-.cta{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:58px;border-radius:18px;background:var(--grad);color:#fff;font-size:18px;font-weight:700;letter-spacing:.2px;margin-top:16px;box-shadow:0 10px 30px -8px rgba(99,102,241,.6)}
+.cta{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:58px;border-radius:18px;background:var(--grad);color:#fff;font-size:18px;font-weight:700;letter-spacing:.2px;margin-top:16px;box-shadow:0 10px 30px -8px rgba(255,216,77,.22)}
 .cta svg{width:22px;height:22px}
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
 .chips.center-row{justify-content:center}
@@ -72,7 +76,7 @@ textarea{resize:vertical;margin-top:10px;line-height:1.45}
 .ttl small{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
 
 /* ============ tab bar ============ */
-.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;justify-content:space-around;height:calc(var(--tabh) + var(--sb));padding:6px 8px var(--sb);background:rgba(13,13,20,.82);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line)}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;justify-content:space-around;height:calc(var(--tabh) + var(--sb));padding:6px 8px var(--sb);background:rgba(18,16,21,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--line)}
 body[data-view=song] .tabbar{display:none}
 .tabbar button{flex:1;max-width:110px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10.5px;font-weight:600;color:var(--muted);padding-top:3px}
 .tabbar button svg{width:24px;height:24px}
@@ -96,11 +100,11 @@ body[data-view=song] .tabbar{display:none}
 .cardhead > div{flex:1;min-width:0}
 .cardhead b{display:block;font-size:16px;font-weight:700}
 .cardhead small{display:block;font-size:13px;color:var(--muted);margin-top:2px}
-.cardhead .ico{width:40px;height:40px;border-radius:12px;background:rgba(139,92,246,.15);color:#c4b5fd;display:grid;place-items:center;flex:none}
+.cardhead .ico{width:40px;height:40px;border-radius:12px;background:rgba(255,216,77,.15);color:var(--acc);display:grid;place-items:center;flex:none}
 .counter{font-size:13px;font-weight:700;color:var(--text2);background:var(--s2);padding:5px 10px;border-radius:999px;font-variant-numeric:tabular-nums}
 
 /* hero / onboarding */
-.hero{border-radius:24px;padding:24px 20px;background:radial-gradient(120% 120% at 100% 0%,rgba(6,182,212,.35),transparent 55%),radial-gradient(120% 120% at 0% 100%,rgba(139,92,246,.45),transparent 60%),var(--s1);border:1px solid var(--line);margin-top:8px}
+.hero{border-radius:24px;padding:24px 20px;background:radial-gradient(120% 120% at 100% 0%,rgba(143,227,207,.14),transparent 55%),radial-gradient(120% 120% at 0% 100%,rgba(255,216,77,.16),transparent 60%),var(--s1);border:1px solid var(--line);margin-top:8px}
 .hero h2{margin:0 0 8px;font-size:26px;line-height:1.15;font-weight:800;letter-spacing:-.5px}
 .hero p{margin:0 0 18px;color:var(--text2);font-size:15px;line-height:1.5}
 .steps{display:flex;flex-direction:column;gap:12px;margin-top:22px}
@@ -176,7 +180,7 @@ body[data-view=song] .tabbar{display:none}
 /* sync */
 .synclyrics{min-height:130px;display:flex;flex-direction:column;justify-content:center;gap:8px;text-align:center;padding:6px 0}
 .synccontrols{display:flex;align-items:center;justify-content:space-around;margin:10px 0 2px}
-.markbtn{width:116px;height:116px;border-radius:50%;background:var(--grad);color:#fff;font-weight:800;font-size:16px;letter-spacing:1px;box-shadow:0 12px 34px -8px rgba(99,102,241,.7)}
+.markbtn{width:116px;height:116px;border-radius:50%;background:var(--grad);color:#fff;font-weight:800;font-size:16px;letter-spacing:1px;box-shadow:0 12px 34px -8px rgba(255,216,77,.22)}
 
 /* ============ game ============ */
 .lyrics.game{display:block;padding:12px 0 4px}
@@ -316,7 +320,7 @@ body.playing #song{padding-top:var(--st)}
 .prog-info > small{display:block;font-size:13px;color:var(--muted);margin-top:2px}
 .prog-chips{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 .pchip{font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px;background:var(--s2);color:var(--text2)}
-.pchip.lvl{background:rgba(139,92,246,.16);color:#c4b5fd}
+.pchip.lvl{background:rgba(255,216,77,.16);color:var(--acc)}
 .prog-stats{display:grid;grid-template-columns:repeat(3,1fr);margin-top:14px;padding-top:12px;border-top:1px solid var(--line);text-align:center}
 .prog-stats div + div{border-left:1px solid var(--line)}
 .prog-stats b{display:block;font-size:20px;font-weight:800;font-variant-numeric:tabular-nums}
@@ -341,18 +345,18 @@ body.playing #song{padding-top:var(--st)}
 .statgrid div{background:var(--s2);border-radius:14px;padding:12px 6px;text-align:center}
 .statgrid b{display:block;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
 .statgrid span{font-size:11.5px;color:var(--muted);line-height:1.25;display:block;margin-top:2px}
-.todayline{display:flex;justify-content:space-around;background:rgba(139,92,246,.1);border-radius:12px;padding:10px 8px;font-size:13px;color:var(--text2);margin-bottom:12px}
+.todayline{display:flex;justify-content:space-around;background:rgba(255,216,77,.1);border-radius:12px;padding:10px 8px;font-size:13px;color:var(--text2);margin-bottom:12px}
 .todayline b{color:var(--text)}
 
 /* heatmap — sequential violet ramp, dim → bright on the dark surface */
 .heatwrap{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 .heatmap{width:100%;height:auto;display:block}
 .heatmap .hlbl{fill:var(--muted);font-size:9px}
-.h0{fill:#22222f;background:#22222f}
-.h1{fill:#3b2f6b;background:#3b2f6b}
-.h2{fill:#5b45b0;background:#5b45b0}
-.h3{fill:#8461f0;background:#8461f0}
-.h4{fill:#c2b0ff;background:#c2b0ff}
+.h0{fill:#27232c;background:#27232c}
+.h1{fill:#4d4321;background:#4d4321}
+.h2{fill:#8f7a2a;background:#8f7a2a}
+.h3{fill:#d4b23a;background:#d4b23a}
+.h4{fill:#ffd84d;background:#ffd84d}
 .heatmap .htoday{stroke:var(--text);stroke-width:1.5}
 .heatmap .hsel{stroke:var(--a2);stroke-width:2}
 .heatlegend{display:flex;align-items:center;justify-content:flex-end;gap:3px;margin-top:8px;font-size:11px;color:var(--muted)}
@@ -373,7 +377,7 @@ body.playing #song{padding-top:var(--st)}
 .stats.four{grid-template-columns:repeat(4,1fr)}
 .stats.four b{font-size:21px}
 .stats .okc{color:var(--ok)} .stats .badc{color:var(--bad)}
-.scoreline{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;background:rgba(139,92,246,.1);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--text2);margin-bottom:10px}
+.scoreline{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;background:rgba(255,216,77,.1);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--text2);margin-bottom:10px}
 .scoreline b{color:var(--text)}
 
 /* translation under the verse being sung: bigger and right there */
@@ -398,7 +402,7 @@ body.playing #song{padding-top:var(--st)}
 .kpad{height:40%}
 .kline{position:relative;padding:9px 38px 9px 6px;border-radius:12px;cursor:pointer;transition:opacity .3s,background .3s;opacity:.45}
 .kline.past{opacity:.3}
-.kline.on{opacity:1;background:rgba(139,92,246,.1)}
+.kline.on{opacity:1;background:rgba(255,216,77,.1)}
 .ko{font-size:17px;font-weight:650;line-height:1.35;transition:font-size .2s,color .2s}
 .kline.on .ko{font-size:22px;font-weight:750;color:#fff}
 .kt{font-size:14.5px;line-height:1.35;color:var(--a2);font-style:italic}
@@ -449,9 +453,9 @@ body.playing #song{padding-top:var(--st)}
 .trfix:hover,.trfix:active{background:var(--s2);color:var(--text);opacity:1}
 .tropt{display:block;width:100%;text-align:left;background:var(--s2);border:1.5px solid transparent;border-radius:14px;padding:11px 13px;margin-top:8px}
 .tropt:disabled{opacity:.6;pointer-events:none}
-.tropt.on{border-color:var(--a1);background:rgba(139,92,246,.12)}
+.tropt.on{border-color:var(--a1);background:rgba(255,216,77,.12)}
 .tropt small{display:block;font-size:11.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
-.tropt.on small{color:#c4b5fd}
+.tropt.on small{color:var(--acc)}
 .tropt > span{display:block;font-size:15.5px;line-height:1.4}
 .tropt textarea{margin-top:2px;background:var(--s1);font-size:15.5px}
 .tropt .btn.wide{margin-top:8px}
@@ -462,10 +466,10 @@ body.playing #song{padding-top:var(--st)}
 .aibox{background:var(--s2);border-radius:14px;padding:14px;margin-top:12px;min-height:56px}
 .aitr{font-size:17px;font-weight:650;line-height:1.4;color:var(--text)}
 .ainote{font-size:14px;line-height:1.5;color:var(--text2);margin-top:8px}
-.ainote b{color:#c4b5fd}
+.ainote b{color:var(--acc)}
 .ainote.err{color:#fb7185;margin-top:0}
 .aisaved{display:block;margin-top:10px;font-size:12px;color:var(--ok)}
-.tropt.aiopt{border:1px solid rgba(139,92,246,.35);background:rgba(139,92,246,.1)}
+.tropt.aiopt{border:1px solid rgba(255,216,77,.35);background:rgba(255,216,77,.1)}
 .aiico{width:22px;text-align:center;font-size:17px}
 #explainBtn{margin-top:14px}
 .explain{background:var(--s2);border-radius:14px;padding:4px 16px 12px;margin-top:4px;font-size:14.5px;line-height:1.6;color:var(--text2)}
@@ -491,7 +495,87 @@ body.playing #song{padding-top:var(--st)}
 .songtr .so{font-size:13px;color:var(--muted)}
 .songtr .st{font-size:15.5px;font-weight:600;color:var(--text);line-height:1.4}
 .songtr .sn{font-size:13px;color:var(--text2);line-height:1.45}
-.songtr .sn b{color:#c4b5fd}
+.songtr .sn b{color:var(--acc)}
 .suggesthead{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--text2);margin:16px 2px 8px;text-transform:uppercase;letter-spacing:.5px}
 .suggesthead span{font-size:17px}
 .suggest button{font-size:13.5px;padding:9px 13px}
+
+/* ================================================================
+   Palco · component layer
+   One brand colour (highlighter yellow), display type for lyrics and
+   titles, neutral answer pad, gaps drawn as a highlighter stroke.
+   ================================================================ */
+
+/* type */
+.apphead h1,.logo,.hero h2,.sectionhead h2,.listhead h3,.feature b,.cardhead b,.sheet h3,.cliptext,
+.line.cur,.lyrics.game .line.cur,.synclyrics .line.cur,.stats b,.tile b,.prog-stats b,.ringwrap b,.lvlbadge,.prog-info > b,.lvlinfo b{font-family:var(--font-display)}
+.logo{font-weight:800;letter-spacing:-.9px}
+.logo .mark{width:30px;height:30px;border-radius:8px;background:none;display:block}
+.line.cur{font-weight:700;letter-spacing:-.4px}
+.lyrics.game .line.cur{font-size:24px;line-height:1.28}
+.hero h2{letter-spacing:-.8px}
+
+/* text on the yellow brand colour is dark ink */
+.btn.primary,.cta,.send,.markbtn,.lvlbadge{background:var(--acc);color:var(--acc-ink)}
+.cta{box-shadow:0 10px 28px -12px rgba(255,216,77,.45)}
+.markbtn{box-shadow:0 12px 30px -10px rgba(255,216,77,.45)}
+.btn.tonal{background:rgba(255,216,77,.12);color:var(--acc)}
+.feature .fab{background:var(--acc);color:var(--acc-ink)}
+.feature .eyebrow{background:rgba(18,16,21,.55);color:var(--acc)}
+.thumb.sq{background:var(--s2);color:var(--acc)}
+.check.on svg{color:var(--acc-ink)}
+.logo .grad{background:none;color:var(--acc)}
+.tabbar button.on svg{color:var(--acc)}
+.chip.on{background:var(--acc);color:var(--acc-ink)}
+
+/* hero: warm, quiet */
+.hero{background:radial-gradient(120% 90% at 100% 0%,rgba(255,216,77,.13),transparent 60%),var(--s1)}
+
+/* gaps: a highlighter stroke under the missing word */
+.gap{border-bottom:none;color:var(--text);letter-spacing:1px;padding:0 4px;border-radius:3px;
+  background:linear-gradient(transparent 58%,rgba(255,216,77,.85) 58%)}
+.gap.active{animation:hl 1.4s ease-in-out infinite}
+@keyframes hl{50%{background:linear-gradient(transparent 58%,rgba(255,216,77,.35) 58%)}}
+
+/* answer pad keeps its four colours (base .opt rules above) */
+.padcenter{background:var(--s2)}
+.replayBtn .ring circle{stroke:var(--acc)}
+
+/* small inline icons that replaced emoji */
+.ii{width:14px;height:14px;display:inline-block;vertical-align:-2px}
+.pi{width:13px;height:13px;display:inline-block;vertical-align:-2px;color:var(--acc)}
+.pchip .ii{color:var(--acc)}
+.spk{width:16px;height:16px;display:inline-block;vertical-align:-3px;margin-right:6px;color:var(--acc)}
+.h3i{width:18px;height:18px;display:inline-block;vertical-align:-3px;margin-right:6px;color:var(--acc)}
+.aiico{width:22px;height:22px;color:var(--acc)}
+.trai{color:var(--acc);font-size:0;filter:none}
+.trai svg{width:14px;height:14px}
+.kai{color:var(--acc)}
+.kai svg{width:18px;height:18px}
+.suggesthead .lc{font:700 10px var(--font-ui);letter-spacing:.5px;color:var(--acc-ink);background:var(--acc);border-radius:4px;padding:2px 5px}
+
+/* progress: yellow ring and bars, mint stays for translations */
+.goalring .fill{stroke:var(--acc)}
+.weekchart .b{fill:var(--acc)}
+.bar > div{background:var(--acc)}
+.badge{background:rgba(139,224,143,.14);color:var(--ok)}
+.notfound,.synchint{background:rgba(255,181,71,.08);border-color:rgba(255,181,71,.25)}
+.airow .btn{white-space:nowrap;font-size:13px;padding:13px 6px}
+.airow .spk{margin-right:5px}
+.grow > svg.aiico{color:var(--acc)}
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.tradj{display:inline-grid;place-items:center;width:28px;height:28px;margin:-4px 0 -4px 2px;vertical-align:middle;border-radius:50%;color:var(--muted);opacity:.85;transition:color .2s,background .2s}
+.tradj svg{width:15px;height:15px}
+.tradj:hover,.tradj:active{background:var(--s2);color:var(--text);opacity:1}
+.tradj.hot{color:var(--warn);background:rgba(255,181,71,.12);opacity:1}
+.lyrics.game{padding-bottom:10px}
+/* previous-verse card: fold / unfold */
+/* the whole left strip of the card is the tap target; no transform, so it never moves under the finger */
+.prevfold{position:absolute;left:0;top:0;bottom:0;width:40px;border-radius:14px 0 0 14px;display:grid;place-items:center;color:var(--muted);touch-action:manipulation}
+.prevfold:active{transform:none;background:var(--s2);color:var(--text)}
+.prevfold svg{width:16px;height:16px;transform:rotate(-90deg)}
+@media (hover:hover){.prevfold:hover{background:var(--s2);color:var(--text)}}
+.prevcard.folded{min-height:0;padding:0;background:none;border-color:transparent;text-align:center;animation:fadein .2s}
+.prevpill{display:inline-flex;align-items:center;gap:6px;padding:5px 12px 5px 9px;border-radius:999px;font-size:12px;font-weight:600;color:var(--muted);background:var(--s1);border:1px solid var(--line)}
+.prevpill svg{width:13px;height:13px;transform:rotate(90deg)}
+.prevpill:active{color:var(--text)}

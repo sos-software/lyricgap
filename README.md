@@ -183,6 +183,7 @@ Quando a letra encontrada não bate com o vídeo (clipe com introdução, versã
 - Para letra de música, quase sempre cai na **tradução automática**. **Não é uma tradução feita por alguém para aquela música.**
 - **Qualidade:** boa para entender o sentido geral, mas literal. Gírias, expressões idiomáticas e metáforas podem sair erradas ou estranhas.
 - **Limite gratuito:** cerca de 5.000 caracteres por dia (umas 3 músicas novas por dia). As traduções ficam guardadas no aparelho, então repetir uma música não gasta o limite.
+- **Quando o limite acaba (ou o serviço falha):** o app passa a usar automaticamente o tradutor alternativo (o mesmo do painel ✎), para nenhum verso ficar sem tradução, e só volta a tentar o MyMemory depois de 6 horas.
 - O idioma de origem é detectado pela letra de cada música (veja [Idiomas](#idiomas)). O destino é sempre português (PT-BR).
 
 ### Melhorar uma tradução (✎)

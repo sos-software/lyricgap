@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Versa · Proposta de design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,700;1,9..144,400;1,9..144,500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--page:#0c0b0f;--ink:#f3efe8;--mute:#9c95a5;--line:rgba(255,255,255,.08)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--ink);font:15px/1.55 Inter,system-ui,sans-serif;padding:40px 16px 80px}
+.wrap{max-width:1180px;margin:0 auto}
+h1{font:800 44px/1.05 'Bricolage Grotesque',sans-serif;letter-spacing:-1.5px;margin:0 0 10px}
+h2{font:800 30px/1.1 'Bricolage Grotesque',sans-serif;letter-spacing:-.8px;margin:0 0 6px}
+h3{font:700 13px/1 Inter,sans-serif;letter-spacing:1.4px;text-transform:uppercase;color:var(--mute);margin:30px 0 14px}
+p.lead{color:var(--mute);font-size:17px;max-width:760px;margin:0 0 8px}
+.tag{display:inline-block;font:700 12px Inter;letter-spacing:1px;text-transform:uppercase;padding:5px 10px;border-radius:999px;margin-bottom:12px}
+.dir{margin-top:64px;padding-top:40px;border-top:1px solid var(--line)}
+.row{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+.swatches{display:flex;gap:10px;flex-wrap:wrap}
+.sw{width:118px;border-radius:14px;overflow:hidden;border:1px solid var(--line);font-size:12px}
+.sw i{display:block;height:64px}
+.sw span{display:block;padding:8px 10px;background:#16141b;color:var(--mute)}
+.sw b{display:block;color:var(--ink);font-weight:600}
+.typo{flex:1;min-width:300px;border:1px solid var(--line);border-radius:18px;padding:20px 22px}
+.notes{columns:2 300px;column-gap:28px;color:#cfc9d6}
+.notes li{margin:0 0 8px;break-inside:avoid}
+.logos{display:flex;gap:22px;flex-wrap:wrap;align-items:center}
+.lockup{display:flex;align-items:center;gap:14px;padding:18px 22px;border-radius:18px}
+.lockup .wm{font:800 44px/1 'Bricolage Grotesque',sans-serif;letter-spacing:-1.8px}
+.sizes{display:flex;align-items:flex-end;gap:14px}
+.phones{display:flex;gap:26px;flex-wrap:wrap;margin-top:6px}
+.cap{font-size:13px;color:var(--mute);margin-top:10px;text-align:center}
+
+/* ---------- phone frame ---------- */
+.phone{width:300px;height:620px;border-radius:44px;padding:10px;background:#000;box-shadow:0 30px 60px -20px rgba(0,0,0,.7),inset 0 0 0 2px #2a2a2e;flex:none}
+.scr{width:100%;height:100%;border-radius:35px;overflow:hidden;position:relative;background:var(--bg);color:var(--tx);font-family:Inter,sans-serif;font-size:12px}
+.sb{height:34px;display:flex;justify-content:space-between;align-items:center;padding:0 22px;font:600 12px Inter}
+.island{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:84px;height:24px;border-radius:14px;background:#000}
+.pad{padding:0 14px}
+.hd{display:flex;align-items:center;justify-content:space-between;height:44px}
+.brand{display:flex;align-items:center;gap:8px;font:800 21px 'Bricolage Grotesque';letter-spacing:-.8px}
+.brand svg{width:26px;height:26px}
+.gear{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:var(--tx2)}
+.card{background:var(--s1);border-radius:18px;padding:12px;border:1px solid var(--bd)}
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:62px;display:flex;justify-content:space-around;align-items:flex-start;padding-top:8px;background:var(--tab);border-top:1px solid var(--bd)}
+.tabbar div{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;font-weight:600;color:var(--tx2)}
+.tabbar div.on{color:var(--tx)}
+.tabbar svg{width:20px;height:20px}
+.ic{width:16px;height:16px;display:inline-block;vertical-align:-3px}
+.vid{height:158px;background:center/cover;position:relative}
+.vid::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(0,0,0,.45))}
+
+/* ---------- Direction A: Palco (warm dark + highlighter) ---------- */
+.A{--bg:#121015;--s1:#1c1920;--s2:#27232c;--bd:rgba(255,255,255,.06);--tx:#f6f1e9;--tx2:#a39cab;--acc:#ffd84d;--acc-ink:#1a1500;--tr:#8fe3cf;--ok:#8be08f;--bad:#ff7b6b;--tab:rgba(18,16,21,.92)}
+.A .goal{display:flex;gap:12px;align-items:center}
+.A .ring{width:54px;height:54px;border-radius:50%;background:conic-gradient(var(--acc) 0 62%,var(--s2) 0);display:grid;place-items:center}
+.A .ring b{width:42px;height:42px;border-radius:50%;background:var(--s1);display:grid;place-items:center;font:800 15px 'Bricolage Grotesque'}
+.A .chipy{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--s2);color:var(--tx2)}
+.A .heat{display:grid;grid-template-columns:repeat(18,1fr);gap:3px;margin-top:10px}
+.A .heat i{aspect-ratio:1;border-radius:3px;background:var(--s2)}
+.A .heat i.h1{background:#4d4321}.A .heat i.h2{background:#8f7a2a}.A .heat i.h3{background:#d4b23a}.A .heat i.h4{background:var(--acc)}
+.A .feature{margin-top:12px;height:150px;border-radius:18px;background:center/cover;position:relative;overflow:hidden}
+.A .feature::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 30%,rgba(10,8,12,.92))}
+.A .feature .t{position:absolute;left:12px;bottom:10px;right:60px;z-index:1}
+.A .feature .eb{font:700 9px Inter;letter-spacing:1.2px;text-transform:uppercase;color:var(--acc)}
+.A .feature b{display:block;font:800 17px/1.15 'Bricolage Grotesque';margin-top:3px}
+.A .feature small{color:#d8d2df;font-size:10.5px}
+.A .fab{position:absolute;right:12px;bottom:12px;z-index:1;width:40px;height:40px;border-radius:50%;background:var(--acc);display:grid;place-items:center;color:var(--acc-ink)}
+.A .sect{font:800 15px 'Bricolage Grotesque';margin:16px 0 8px;display:flex;justify-content:space-between;align-items:baseline}
+.A .sect a{font:600 11px Inter;color:var(--acc)}
+.A .car{display:flex;gap:8px}
+.A .car div{width:96px;flex:none}
+.A .car i{display:block;aspect-ratio:16/9;border-radius:10px;background:center/cover}
+.A .car b{display:block;font-size:10.5px;margin-top:5px;line-height:1.25}
+/* game */
+.A .hud{display:flex;align-items:center;gap:6px;height:40px}
+.A .end{font-size:11px;font-weight:600;color:var(--tx2);padding:5px 10px;border-radius:999px;background:var(--s1)}
+.A .stat{font:700 11px Inter;padding:4px 8px;border-radius:999px;background:var(--s1);display:inline-flex;gap:4px;align-items:center}
+.A .prog{height:3px;background:var(--s2);border-radius:3px;overflow:hidden}
+.A .prog i{display:block;height:100%;width:46%;background:var(--acc)}
+.A .prev{margin-top:10px;font-size:11px;color:var(--tx2);text-align:center;line-height:1.4}
+.A .prev em{display:block;font-style:normal;color:var(--tr);font-size:10.5px}
+.A .lyric{font:700 23px/1.25 'Bricolage Grotesque';text-align:center;margin:18px 4px 6px;letter-spacing:-.4px}
+.A .gapA{display:inline-block;min-width:74px;height:28px;vertical-align:-5px;border-radius:6px;background:linear-gradient(transparent 55%,var(--acc) 55%)}
+.A .trl{text-align:center;color:var(--tr);font-size:12.5px}
+.A .cross{display:grid;grid-template-columns:1fr 54px 1fr;gap:8px;align-items:center;justify-items:center;margin-top:14px}
+.A .opt{height:42px;border-radius:14px;background:var(--s1);border:1.5px solid var(--bd);font:700 13.5px Inter;display:flex;align-items:center;justify-content:center;gap:6px;width:100%}
+.A .opt kbd{font:700 9px Inter;color:var(--tx2);border:1px solid var(--s2);border-radius:4px;padding:1px 4px}
+.A .opt.up,.A .opt.down{grid-column:1/4;width:62%}
+.A .opt.sel{border-color:var(--acc);box-shadow:0 0 0 3px rgba(255,216,77,.15)}
+.A .ctr{width:54px;height:54px;border-radius:50%;background:var(--s2);display:grid;place-items:center;grid-column:2;position:relative}
+.A .ctr::before{content:"";position:absolute;inset:-3px;border-radius:50%;border:3px solid transparent;border-top-color:var(--acc);border-right-color:var(--acc)}
+.A .acts{display:flex;justify-content:space-around;margin-top:16px;font-size:9.5px;color:var(--tx2);text-align:center}
+.A .acts i{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:var(--s1);margin:0 auto 4px;color:var(--tx)}
+/* sheet */
+.A .sheet{position:absolute;left:0;right:0;bottom:0;top:180px;background:var(--s1);border-radius:24px 24px 0 0;padding:10px 14px;border-top:1px solid var(--bd)}
+.A .grab{width:34px;height:4px;border-radius:2px;background:var(--s2);margin:0 auto 10px}
+.A .sheet h4{font:800 17px 'Bricolage Grotesque';margin:0 0 10px;text-align:center}
+.A .item{background:var(--s2);border-radius:12px;padding:9px 11px;margin-bottom:7px}
+.A .item .o{font-size:10.5px;color:var(--tx2)}
+.A .item .t{font:600 13px/1.35 Inter;margin-top:1px}
+.A .item .n{font-size:10.5px;color:var(--tx2);margin-top:3px}
+.A .item .n b{color:var(--acc);font-weight:700}
+
+/* ---------- Direction B: Caderno (light paper + pen + highlighter) ---------- */
+.B{--bg:#f4efe6;--s1:#fffdf8;--s2:#ebe4d7;--bd:rgba(40,30,20,.08);--tx:#1c1915;--tx2:#7b7368;--acc:#2447d6;--hl:#ffe45c;--tr:#2447d6;--ok:#1f8a4c;--bad:#c4372b;--tab:rgba(250,247,240,.94)}
+.B .brand{font-family:'Fraunces',serif;font-weight:700;letter-spacing:-.6px}
+.B .card{box-shadow:0 1px 0 rgba(40,30,20,.04),0 6px 20px -12px rgba(40,30,20,.25)}
+.B .goal{display:flex;gap:12px;align-items:center}
+.B .ring{width:54px;height:54px;border-radius:50%;background:conic-gradient(var(--acc) 0 62%,var(--s2) 0);display:grid;place-items:center}
+.B .ring b{width:44px;height:44px;border-radius:50%;background:var(--s1);display:grid;place-items:center;font:700 16px 'Fraunces'}
+.B .chipy{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:3px 8px;border-radius:999px;background:var(--s2);color:var(--tx2)}
+.B .heat{display:grid;grid-template-columns:repeat(18,1fr);gap:3px;margin-top:10px}
+.B .heat i{aspect-ratio:1;border-radius:3px;background:var(--s2)}
+.B .heat i.h1{background:#c9d3f5}.B .heat i.h2{background:#8ea1ec}.B .heat i.h3{background:#5470e0}.B .heat i.h4{background:var(--acc)}
+.B .note{font:italic 500 19px/1.3 'Fraunces';margin:16px 2px 6px}
+.B .list .r{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--bd)}
+.B .list i{width:62px;aspect-ratio:16/9;border-radius:8px;background:center/cover;flex:none}
+.B .list b{display:block;font:600 11.5px/1.3 Inter}
+.B .list small{color:var(--tx2);font-size:10px}
+.B .badge{font:700 8.5px Inter;letter-spacing:.5px;padding:2px 6px;border-radius:4px;background:var(--hl);color:#3d3300;margin-right:4px}
+/* game */
+.B .hud{display:flex;align-items:center;gap:6px;height:40px}
+.B .end{font-size:11px;font-weight:600;color:var(--tx2);padding:5px 10px;border-radius:999px;background:var(--s1);border:1px solid var(--bd)}
+.B .stat{font:700 11px Inter;padding:4px 8px;border-radius:999px;background:var(--s1);border:1px solid var(--bd)}
+.B .sheetpaper{margin-top:10px;background:var(--s1);border-radius:16px;padding:14px 14px 16px;border:1px solid var(--bd);background-image:repeating-linear-gradient(transparent 0 27px,rgba(36,71,214,.08) 27px 28px);background-position:0 9px}
+.B .prev{font:400 11.5px/1.4 'Fraunces';color:var(--tx2)}
+.B .prev em{display:block;font-style:italic;color:var(--tr)}
+.B .lyric{font:500 24px/1.3 'Fraunces';margin:14px 0 4px;letter-spacing:-.3px}
+.B .gapB{display:inline-block;min-width:80px;height:26px;vertical-align:-5px;border-bottom:2.5px solid var(--tx);background:linear-gradient(transparent 40%,rgba(255,228,92,.85) 40%)}
+.B .trl{font:italic 400 14px 'Fraunces';color:var(--tr)}
+.B .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.B .opt{height:46px;border-radius:12px;background:var(--s1);border:1.5px solid var(--tx);font:600 14px Inter;display:flex;align-items:center;gap:8px;padding:0 12px;box-shadow:3px 3px 0 var(--tx)}
+.B .opt kbd{width:20px;height:20px;border-radius:50%;background:var(--tx);color:var(--bg);font:700 10px Inter;display:grid;place-items:center}
+.B .opt.sel{background:var(--hl)}
+.B .acts{display:flex;justify-content:space-around;margin-top:16px;font-size:9.5px;color:var(--tx2);text-align:center}
+.B .acts i{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:var(--s1);border:1px solid var(--bd);margin:0 auto 4px;color:var(--tx)}
+.B .cta{margin-top:12px;height:44px;border-radius:14px;background:var(--tx);color:var(--bg);display:flex;align-items:center;justify-content:center;gap:8px;font:600 14px Inter}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <!-- refined "o + s" note: perfect-circle head (o), one continuous monoline stem + flag (s), equal stroke weight -->
+    <symbol id="note" viewBox="0 0 64 64">
+      <circle cx="23" cy="45" r="10" fill="none" stroke="currentColor" stroke-width="6"/>
+      <path d="M33 45 V11 C45 11 52 17 47 23.5 C43 28.5 40.5 30 44.5 35.5 C48.5 41 50 46.5 43.5 50.5" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.4 1.3-3.9 2.5-5 .2 1.6 1 2.6 2 3 0-3 .2-5.3.5-8z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18.5 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" fill="currentColor"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-4-4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-lib" viewBox="0 0 24 24"><path d="M5 4v16M10 4v16M15 4.5l4.5 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-bm" viewBox="0 0 24 24"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="17" r="2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></symbol>
+    <symbol id="i-replay" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M4 4v4.5h4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M19 6l-9 6 9 6zM6 6v12" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="3.6" height="14" rx="1.3" fill="currentColor"/><rect x="13.9" y="5" width="3.6" height="14" rx="1.3" fill="currentColor"/></symbol>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <span class="tag" style="background:#25212b;color:#ffd84d">Proposta para aprovação</span>
+  <h1>Versa · nova direção de design</h1>
+  <p class="lead">Duas direções para o app inteiro e um logo redesenhado. Nada disso foi aplicado: escolha uma (ou peça ajustes) e eu aplico em todas as telas.</p>
+
+  <h3>Diagnóstico do design atual</h3>
+  <ul class="notes">
+    <li><b>Gradiente violeta → ciano</b> é a paleta padrão de "app de IA". Aparece em tudo (logo, botões, barras), então nada ganha destaque e o app parece genérico.</li>
+    <li><b>Emoji misturado com ícones desenhados</b> (🔥 ✨ 🎯 e bandeiras) passa improviso. A proposta troca por um único conjunto de ícones.</li>
+    <li><b>Controle em cruz com 4 cores</b> (violeta, ciano, rosa, âmbar) sem relação com a marca, com cara de brinquedo.</li>
+    <li><b>A letra da música, estrela do app, usa a fonte dos menus.</b> As duas direções dão uma tipografia própria para a letra.</li>
+    <li><b>Logo C:</b> a ideia (cabeça "o" + bandeirinha "s") é boa, mas o traço é fino e irregular e a cabeça elíptica não lê como "o". O redesenho usa um círculo perfeito e uma linha contínua de espessura única.</li>
+  </ul>
+
+  <h3>Logo redesenhado (mesma ideia, desenho mais firme)</h3>
+  <div class="logos">
+    <div class="lockup" style="background:#121015"><svg width="64" height="64"><rect width="64" height="64" rx="15" fill="#ffd84d"/><use href="#note" x="4" y="4" width="56" height="56" style="color:#1a1500"/></svg><span class="wm" style="color:#f6f1e9">versa</span></div>
+    <div class="lockup" style="background:#f4efe6"><svg width="64" height="64"><rect width="64" height="64" rx="15" fill="#2447d6"/><use href="#note" x="4" y="4" width="56" height="56" style="color:#fffdf8"/></svg><span class="wm" style="color:#1c1915;font-family:Fraunces,serif;font-weight:700;letter-spacing:-1px">versa</span></div>
+    <div class="sizes">
+      <svg width="58" height="58"><rect width="58" height="58" rx="13" fill="#ffd84d"/><use href="#note" x="4" y="4" width="50" height="50" style="color:#1a1500"/></svg>
+      <svg width="40" height="40"><rect width="40" height="40" rx="9" fill="#ffd84d"/><use href="#note" x="3" y="3" width="34" height="34" style="color:#1a1500"/></svg>
+      <svg width="24" height="24"><rect width="24" height="24" rx="6" fill="#ffd84d"/><use href="#note" x="2" y="2" width="20" height="20" style="color:#1a1500"/></svg>
+      <svg width="58" height="58"><rect width="58" height="58" rx="13" fill="#2447d6"/><use href="#note" x="4" y="4" width="50" height="50" style="color:#fff"/></svg>
+      <svg width="40" height="40"><rect width="40" height="40" rx="9" fill="#2447d6"/><use href="#note" x="3" y="3" width="34" height="34" style="color:#fff"/></svg>
+      <svg width="24" height="24"><rect width="24" height="24" rx="6" fill="#2447d6"/><use href="#note" x="2" y="2" width="20" height="20" style="color:#fff"/></svg>
+    </div>
+  </div>
+  <p class="cap" style="text-align:left">Cor única no lugar do gradiente: mais memorável, nítido em 24px e fácil de reconhecer na Tela de Início.</p>
+
+  <!-- ================= DIRECTION A ================= -->
+  <section class="dir">
+    <span class="tag" style="background:#ffd84d;color:#1a1500">Direção A</span>
+    <h2>Palco</h2>
+    <p class="lead">Escuro e quente, como uma casa de show. Uma única cor de marca, o <b>amarelo marca-texto</b>, que também é a cor das lacunas: a letra parece grifada. Tipografia expressiva (Bricolage Grotesque) para a letra e os títulos.</p>
+    <div class="row" style="margin-top:18px">
+      <div class="swatches">
+        <div class="sw"><i style="background:#121015"></i><span><b>Noite</b>#121015</span></div>
+        <div class="sw"><i style="background:#1c1920"></i><span><b>Palco</b>#1C1920</span></div>
+        <div class="sw"><i style="background:#f6f1e9"></i><span><b>Papel</b>#F6F1E9</span></div>
+        <div class="sw"><i style="background:#ffd84d"></i><span><b>Marca-texto</b>#FFD84D</span></div>
+        <div class="sw"><i style="background:#8fe3cf"></i><span><b>Tradução</b>#8FE3CF</span></div>
+      </div>
+      <div class="typo" style="background:#121015">
+        <div style="font:800 34px/1.05 'Bricolage Grotesque';letter-spacing:-1px">On danse jusqu'au matin</div>
+        <div style="color:#8fe3cf;margin-top:6px">A gente dança até de manhã</div>
+        <div style="color:#a39cab;font-size:12px;margin-top:10px">Letra e títulos: Bricolage Grotesque · Interface: Inter</div>
+      </div>
+    </div>
+    <div class="phones" style="margin-top:26px">
+      <!-- A: home -->
+      <div><div class="phone"><div class="scr A">
+        <div class="island"></div><div class="sb"><span>9:41</span><span>●●●</span></div>
+        <div class="pad">
+          <div class="hd"><div class="brand"><svg><rect width="26" height="26" rx="7" fill="#ffd84d"/><use href="#note" x="2" y="2" width="22" height="22" style="color:#1a1500"/></svg>versa</div><div class="gear"><svg class="ic"><use href="#i-gear"/></svg></div></div>
+          <div class="card">
+            <div class="goal"><div class="ring"><b>12</b></div><div style="flex:1"><div style="font:800 14px 'Bricolage Grotesque'">Meta de hoje</div><div style="color:var(--tx2);font-size:10.5px">Faltam 8 palavras certas</div>
+              <div style="margin-top:5px;display:flex;gap:5px"><span class="chipy"><svg class="ic" style="width:12px;height:12px;color:var(--acc)"><use href="#i-flame"/></svg>4 dias</span><span class="chipy">Nível 3</span></div></div></div>
+            <div class="heat"><i></i><i class="h1"></i><i></i><i class="h2"></i><i class="h3"></i><i></i><i class="h1"></i><i class="h4"></i><i></i><i class="h2"></i><i></i><i class="h3"></i><i class="h4"></i><i class="h2"></i><i></i><i class="h1"></i><i class="h3"></i><i class="h4"></i><i class="h1"></i><i></i><i class="h2"></i><i class="h3"></i><i></i><i class="h4"></i><i class="h1"></i><i class="h2"></i><i></i><i class="h3"></i><i class="h4"></i><i class="h2"></i><i></i><i class="h1"></i><i class="h3"></i><i class="h4"></i><i class="h3"></i><i class="h4"></i></div>
+          </div>
+          <div class="feature" style="background-image:url(https://i.ytimg.com/vi/EkGiGf8utCM/hqdefault.jpg)"><div class="t"><span class="eb">Continuar</span><b>Copines</b><small>Aya Nakamura · recorde 18</small></div><div class="fab"><svg class="ic"><use href="#i-play"/></svg></div></div>
+          <div class="sect">Recentes <a>Ver tudo</a></div>
+          <div class="car"><div><i style="background-image:url(https://i.ytimg.com/vi/0Tl08kTvod0/mqdefault.jpg)"></i><b>Papaoutai</b></div><div><i style="background-image:url(https://i.ytimg.com/vi/PTdzL_K_ss8/mqdefault.jpg)"></i><b>No Thanks, I'll Pass</b></div><div><i style="background-image:url(https://i.ytimg.com/vi/dBk1xn64-As/mqdefault.jpg)"></i><b>No Stress</b></div></div>
+        </div>
+        <div class="tabbar"><div class="on"><svg style="color:var(--acc)"><use href="#i-home"/></svg>Início</div><div><svg><use href="#i-search"/></svg>Buscar</div><div><svg><use href="#i-lib"/></svg>Biblioteca</div><div><svg><use href="#i-bm"/></svg>Frases</div></div>
+      </div></div><div class="cap">Início</div></div>
+      <!-- A: game -->
+      <div><div class="phone"><div class="scr A">
+        <div class="island"></div><div class="sb"><span>9:41</span><span>●●●</span></div>
+        <div class="vid" style="background-image:url(https://i.ytimg.com/vi/EkGiGf8utCM/hqdefault.jpg)"></div>
+        <div class="pad">
+          <div class="hud"><span class="end">✕ Encerrar</span><span style="flex:1"></span><span class="stat" style="color:var(--ok)">✓ 7</span><span class="stat" style="color:var(--bad)">✗ 2</span><span class="stat"><svg class="ic" style="width:12px;height:12px;color:var(--acc)"><use href="#i-flame"/></svg>3</span></div>
+          <div class="prog"><i></i></div>
+          <div class="prev">Il pleut sur la ville ce soir<em>Chove na cidade esta noite</em></div>
+          <div class="lyric">Je cherche ton <span class="gapA"></span> dans la nuit</div>
+          <div class="trl">Procuro o seu olhar na noite</div>
+          <div class="cross">
+            <div class="opt up"><kbd>↑</kbd>chemin</div>
+            <div class="opt"><kbd>←</kbd>silence</div>
+            <div class="ctr"><svg class="ic" style="width:20px;height:20px"><use href="#i-replay"/></svg></div>
+            <div class="opt sel"><kbd>→</kbd>regard</div>
+            <div class="opt down"><kbd>↓</kbd>lumière</div>
+          </div>
+          <div class="acts"><div><i><svg class="ic"><use href="#i-prev"/></svg></i>Voltar</div><div><i><svg class="ic"><use href="#i-bulb"/></svg></i>Dica</div><div><i><svg class="ic"><use href="#i-pause"/></svg></i>Pausa</div><div><i style="font:700 11px Inter">1x</i>Velocidade</div></div>
+        </div>
+      </div></div><div class="cap">Jogo: lacuna grifada, opções neutras</div></div>
+      <!-- A: translation sheet -->
+      <div><div class="phone"><div class="scr A">
+        <div class="island"></div><div class="sb"><span>9:41</span><span>●●●</span></div>
+        <div class="vid" style="background-image:url(https://i.ytimg.com/vi/EkGiGf8utCM/hqdefault.jpg);opacity:.5"></div>
+        <div class="sheet"><div class="grab"></div><h4><svg class="ic" style="color:var(--acc)"><use href="#i-spark"/></svg> Tradução da música</h4>
+          <div class="item"><div class="o">C'est chelou, cette soirée</div><div class="t">Que estranha esta noite</div><div class="n"><b>Entenda:</b> "chelou" é "louche" em verlan, a gíria que inverte as sílabas: estranho.</div></div>
+          <div class="item"><div class="o">J'ai la flemme de rentrer</div><div class="t">Tô com preguiça de ir pra casa</div><div class="n"><b>Entenda:</b> "avoir la flemme" é estar com preguiça.</div></div>
+          <div class="item"><div class="o">On se capte plus tard</div><div class="t">A gente se fala mais tarde</div></div>
+        </div>
+      </div></div><div class="cap">Tradução inteligente</div></div>
+    </div>
+  </section>
+
+  <!-- ================= DIRECTION B ================= -->
+  <section class="dir">
+    <span class="tag" style="background:#2447d6;color:#fff">Direção B</span>
+    <h2>Caderno</h2>
+    <p class="lead">Claro, como estudar com a letra impressa: papel, <b>caneta azul</b> e <b>marca-texto amarelo</b> nas lacunas. A letra aparece em serifa (Fraunces), com cara editorial, e a tradução em itálico azul, como anotação. As opções são cartões com sombra dura, o que dá um toque de jogo.</p>
+    <div class="row" style="margin-top:18px">
+      <div class="swatches">
+        <div class="sw"><i style="background:#f4efe6"></i><span><b>Papel</b>#F4EFE6</span></div>
+        <div class="sw"><i style="background:#fffdf8"></i><span><b>Folha</b>#FFFDF8</span></div>
+        <div class="sw"><i style="background:#1c1915"></i><span><b>Tinta</b>#1C1915</span></div>
+        <div class="sw"><i style="background:#2447d6"></i><span><b>Caneta</b>#2447D6</span></div>
+        <div class="sw"><i style="background:#ffe45c"></i><span><b>Marca-texto</b>#FFE45C</span></div>
+      </div>
+      <div class="typo" style="background:#f4efe6;color:#1c1915;border-color:rgba(0,0,0,.08)">
+        <div style="font:500 32px/1.1 Fraunces;letter-spacing:-.6px">On danse jusqu'au matin</div>
+        <div style="font:italic 400 17px Fraunces;color:#2447d6;margin-top:6px">A gente dança até de manhã</div>
+        <div style="color:#7b7368;font-size:12px;margin-top:10px">Letra e títulos: Fraunces · Interface: Inter</div>
+      </div>
+    </div>
+    <div class="phones" style="margin-top:26px">
+      <!-- B: home -->
+      <div><div class="phone"><div class="scr B">
+        <div class="island"></div><div class="sb"><span>9:41</span><span>●●●</span></div>
+        <div class="pad">
+          <div class="hd"><div class="brand"><svg><rect width="26" height="26" rx="7" fill="#2447d6"/><use href="#note" x="2" y="2" width="22" height="22" style="color:#fff"/></svg>versa</div><div class="gear"><svg class="ic"><use href="#i-gear"/></svg></div></div>
+          <div class="card">
+            <div class="goal"><div class="ring"><b>12</b></div><div style="flex:1"><div style="font:700 15px Fraunces">Meta de hoje</div><div style="color:var(--tx2);font-size:10.5px">Faltam 8 palavras certas</div>
+              <div style="margin-top:5px;display:flex;gap:5px"><span class="chipy"><svg class="ic" style="width:12px;height:12px;color:#d9480f"><use href="#i-flame"/></svg>4 dias</span><span class="chipy">Nível 3</span></div></div></div>
+            <div class="heat"><i></i><i class="h1"></i><i></i><i class="h2"></i><i class="h3"></i><i></i><i class="h1"></i><i class="h4"></i><i></i><i class="h2"></i><i></i><i class="h3"></i><i class="h4"></i><i class="h2"></i><i></i><i class="h1"></i><i class="h3"></i><i class="h4"></i><i class="h1"></i><i></i><i class="h2"></i><i class="h3"></i><i></i><i class="h4"></i><i class="h1"></i><i class="h2"></i><i></i><i class="h3"></i><i class="h4"></i><i class="h2"></i><i></i><i class="h1"></i><i class="h3"></i><i class="h4"></i><i class="h3"></i><i class="h4"></i></div>
+          </div>
+          <div class="note">Continue de onde parou</div>
+          <div class="card list" style="padding:4px 12px">
+            <div class="r"><i style="background-image:url(https://i.ytimg.com/vi/EkGiGf8utCM/mqdefault.jpg)"></i><div><b>Copines</b><small><span class="badge">PRONTA</span>Aya Nakamura</small></div></div>
+            <div class="r"><i style="background-image:url(https://i.ytimg.com/vi/0Tl08kTvod0/mqdefault.jpg)"></i><div><b>Papaoutai</b><small><span class="badge">PRONTA</span>Stromae</small></div></div>
+            <div class="r" style="border:none"><i style="background-image:url(https://i.ytimg.com/vi/PTdzL_K_ss8/mqdefault.jpg)"></i><div><b>No Thanks, I'll Pass</b><small>Kylie Dailey</small></div></div>
+          </div>
+          <div class="cta"><svg class="ic"><use href="#i-search"/></svg>Buscar uma música</div>
+        </div>
+        <div class="tabbar"><div class="on"><svg style="color:var(--acc)"><use href="#i-home"/></svg>Início</div><div><svg><use href="#i-search"/></svg>Buscar</div><div><svg><use href="#i-lib"/></svg>Biblioteca</div><div><svg><use href="#i-bm"/></svg>Frases</div></div>
+      </div></div><div class="cap">Início</div></div>
+      <!-- B: game -->
+      <div><div class="phone"><div class="scr B">
+        <div class="island"></div><div class="sb"><span>9:41</span><span>●●●</span></div>
+        <div class="vid" style="background-image:url(https://i.ytimg.com/vi/EkGiGf8utCM/hqdefault.jpg)"></div>
+        <div class="pad">
+          <div class="hud"><span class="end">✕ Encerrar</span><span style="flex:1"></span><span class="stat" style="color:var(--ok)">✓ 7</span><span class="stat" style="color:var(--bad)">✗ 2</span><span class="stat"><svg class="ic" style="width:12px;height:12px;color:#d9480f"><use href="#i-flame"/></svg>3</span></div>
+          <div class="sheetpaper">
+            <div class="prev">Il pleut sur la ville ce soir<em>Chove na cidade esta noite</em></div>
+            <div class="lyric">Je cherche ton <span class="gapB"></span> dans la nuit</div>
+            <div class="trl">Procuro o seu olhar na noite</div>
+          </div>
+          <div class="grid">
+            <div class="opt"><kbd>A</kbd>chemin</div><div class="opt sel"><kbd>B</kbd>regard</div>
+            <div class="opt"><kbd>C</kbd>silence</div><div class="opt"><kbd>D</kbd>lumière</div>
+          </div>
+          <div class="acts"><div><i><svg class="ic"><use href="#i-prev"/></svg></i>Voltar</div><div><i><svg class="ic"><use href="#i-replay"/></svg></i>Ouvir</div><div><i><svg class="ic"><use href="#i-bulb"/></svg></i>Dica</div><div><i><svg class="ic"><use href="#i-pause"/></svg></i>Pausa</div></div>
+        </div>
+      </div></div><div class="cap">Jogo: folha pautada, cartões A B C D</div></div>
+    </div>
+  </section>
+
+  <section class="dir">
+    <h2>Em comum nas duas direções</h2>
+    <ul class="notes">
+      <li><b>Uma cor de marca só</b> (amarelo ou azul) em vez do gradiente. Verde e vermelho ficam só para acerto e erro.</li>
+      <li><b>Ícones próprios no lugar de emoji:</b> chama (sequência), brilho (IA), sem bandeiras na interface.</li>
+      <li><b>A letra ganha fonte própria</b>, maior e mais expressiva que os menus.</li>
+      <li><b>A lacuna vira um "grifo" de marca-texto</b>, ligando a identidade ao jogo.</li>
+      <li><b>O logo "o + s"</b> redesenhado com círculo perfeito e traço único, em cor sólida.</li>
+      <li>Nada muda no funcionamento: só o visual. Depois da escolha, aplico em todas as telas, gero os ícones novos e mostro antes de publicar.</li>
+    </ul>
+  </section>
+</div>
+</body>
+</html>

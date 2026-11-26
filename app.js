@@ -24,7 +24,7 @@ const icon = (name, cls = '') => `<svg class="${cls}"><use href="#i-${name}"/></
 
 /* ================= settings & library ================= */
 const settings = Object.assign(
-  { pace: 'pause', difficulty: 'medio', mode: 'choice', speed: 1, translate: true, lang: 'en', autoReplay: 8, sounds: true, ytKey: '', pipedOk: '', goal: 20, musicOnly: true, karTr: 'side', claudeKey: '', aiModel: 'claude-haiku-5-5' },
+  { pace: 'pause', difficulty: 'medio', mode: 'choice', speed: 1, translate: true, lang: 'en', autoReplay: 8, sounds: true, ytKey: '', pipedOk: '', goal: 20, musicOnly: true, karTr: 'side', claudeKey: '', aiModel: 'claude-haiku-5-5', showPrev: true },
   store.get('lg:settings', {})
 );
 const saveSettings = () => store.set('lg:settings', settings);
@@ -71,8 +71,8 @@ function stat(k, n = 1) {
   clearTimeout(statSaveT); statSaveT = setTimeout(saveLib, 1500);
   if (k === 'ms') return;
   const after = levelOf(xpOf(st));
-  if (after.level > before) toast(`⬆️ Nível ${after.level} · ${after.name}!`);
-  else if (k === 'words' && !goalBefore && d.words >= settings.goal) toast('🎯 Meta do dia batida!');
+  if (after.level > before) toast(`Você chegou ao nível ${after.level} · ${after.name}`);
+  else if (k === 'words' && !goalBefore && d.words >= settings.goal) toast('Meta do dia batida');
 }
 const SONG_BONUS = 10;
 const xpOf = st => st.words + st.songs * SONG_BONUS;   // same rule as the in-game points: 1 per word, +10 per finished song
@@ -308,13 +308,13 @@ function renderHomeTab() {
 
 // search suggestions: recent hits by language (each chip runs that search)
 const SUGGEST = [
-  ['🇺🇸', 'Inglês', ['Billie Eilish Birds of a Feather', 'Sabrina Carpenter Espresso', 'Lady Gaga Bruno Mars Die With A Smile', 'Ed Sheeran Perfect']],
-  ['🇪🇸', 'Espanhol', ['Bad Bunny DtMF', 'Shakira Soltera', 'Karol G Si Antes Te Hubiera Conocido', 'Karol G Shakira TQG']],
-  ['🇫🇷', 'Francês', ['Aya Nakamura Djadja', 'Stromae Papaoutai', 'ZAZ Je veux', 'Indila Dernière danse']],
-  ['🇩🇪', 'Alemão', ['Peter Fox Zukunft Pink', 'Nina Chuba Wildberry Lillet', 'Apache 207 Roller', 'Sido Astronaut']],
-  ['🇯🇵', 'Japonês', ['YOASOBI Idol', 'Creepy Nuts Bling-Bang-Bang-Born', 'Fujii Kaze Shinunoga E-Wa', 'Kenshi Yonezu Lemon']],
-  ['🇰🇷', 'Coreano', ['NewJeans Ditto', 'aespa Supernova', 'IVE Love Dive', 'BTS Spring Day']],
-  ['🇮🇹', 'Italiano', ['Måneskin Zitti e buoni', 'Mahmood Soldi', 'Laura Pausini La soledad']]
+  ['EN', 'Inglês', ['Billie Eilish Birds of a Feather', 'Sabrina Carpenter Espresso', 'Lady Gaga Bruno Mars Die With A Smile', 'Ed Sheeran Perfect']],
+  ['ES', 'Espanhol', ['Bad Bunny DtMF', 'Shakira Soltera', 'Karol G Si Antes Te Hubiera Conocido', 'Karol G Shakira TQG']],
+  ['FR', 'Francês', ['Aya Nakamura Djadja', 'Stromae Papaoutai', 'ZAZ Je veux', 'Indila Dernière danse']],
+  ['DE', 'Alemão', ['Peter Fox Zukunft Pink', 'Nina Chuba Wildberry Lillet', 'Apache 207 Roller', 'Sido Astronaut']],
+  ['JA', 'Japonês', ['YOASOBI Idol', 'Creepy Nuts Bling-Bang-Bang-Born', 'Fujii Kaze Shinunoga E-Wa', 'Kenshi Yonezu Lemon']],
+  ['KO', 'Coreano', ['NewJeans Ditto', 'aespa Supernova', 'IVE Love Dive', 'BTS Spring Day']],
+  ['IT', 'Italiano', ['Måneskin Zitti e buoni', 'Mahmood Soldi', 'Laura Pausini La soledad']]
 ];
 function renderSearchTab() {
   const box = $('#searchList'); box.innerHTML = '';
@@ -328,7 +328,7 @@ function renderSearchTab() {
   if (!H.results) {
     const s = el('div', ''); s.appendChild(el('div', 'sectionhead', '<h2 style="font-size:17px">Sucessos para praticar</h2>'));
     SUGGEST.forEach(([flag, name, songs]) => {
-      s.appendChild(el('div', 'suggesthead', `<span>${flag}</span>${esc(name)}`));
+      s.appendChild(el('div', 'suggesthead', `<span class="lc">${flag}</span>${esc(name)}`));
       const wrap = el('div', 'suggest');
       songs.forEach(q => { const b = el('button', '', esc(q)); b.onclick = () => { $('#q').value = q; doSearch(q); }; wrap.appendChild(b); });
       s.appendChild(wrap);
@@ -469,9 +469,9 @@ function progressCard() {
     <div class="prog-top">
       <div class="ringwrap">${ringSVG(t.words / settings.goal)}<span><b>${t.words}</b><small>/${settings.goal}</small></span></div>
       <div class="prog-info">
-        <b>${done ? 'Meta de hoje batida 🎯' : 'Meta de hoje'}</b>
+        <b>${done ? 'Meta de hoje batida' : 'Meta de hoje'}</b>
         <small>${done ? `${t.words} palavras certas hoje` : `Faltam ${settings.goal - t.words} palavras certas`}</small>
-        <div class="prog-chips"><span class="pchip">🔥 ${streak} dia${streak === 1 ? '' : 's'}</span><span class="pchip lvl">Nível ${lv.level}</span></div>
+        <div class="prog-chips"><span class="pchip">${icon('flame', 'ii')} ${streak} dia${streak === 1 ? '' : 's'}</span><span class="pchip lvl">Nível ${lv.level}</span></div>
       </div>
       ${icon('chev')}
     </div>
@@ -523,7 +523,7 @@ function sheetProgress() {
     <div class="statgrid">${tiles.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>
     <div class="grouplabel">Meta diária de palavras certas</div>
     ${seg('goal', [[10, '10'], [20, '20'], [30, '30'], [50, '50'], [100, '100']], settings.goal)}
-    <p class="caption">XP: 1 por palavra certa e ${SONG_BONUS} por música completa (jogada até o fim). Jogue um pouco todo dia para manter a sequência 🔥.</p>
+    <p class="caption">XP: 1 por palavra certa e ${SONG_BONUS} por música completa (jogada até o fim). Jogue um pouco todo dia para manter a sequência.</p>
     <button class="btn primary wide" data-a="ok">Fechar</button>`, { ok: closeSheet });
   $('#sheetContent .heatcard').addEventListener('click', e => {
     const r = e.target.closest('[data-tip]'); if (!r) return;
@@ -810,11 +810,11 @@ function renderReady() {
   const hint = $('#syncHint');
   if (S.v && S.v.syncHint) {
     hint.innerHTML = `<div class="synchint"><b>A letra pode estar fora do ritmo</b><span>Ela é de uma versão um pouco diferente deste vídeo. Se o texto aparecer adiantado ou atrasado, acerte com um ou dois toques.</span>
-      <div class="sheetbtns"><button class="btn primary" id="qsGo">⚡ Sincronia rápida</button><button class="btn" id="qsDismiss">Está certa</button></div></div>`;
+      <div class="sheetbtns"><button class="btn primary" id="qsGo">Sincronia rápida</button><button class="btn" id="qsDismiss">Está certa</button></div></div>`;
     $('#qsGo').onclick = sheetQuickSync;
     $('#qsDismiss').onclick = () => { delete S.v.syncHint; saveLib(); renderReady(); };
   } else hint.innerHTML = '';
-  $('#songTrBtn').textContent = S.v && S.v.aiSong ? '✨ Ver a tradução' : '✨ Traduzir a música';
+  $('#songTrBtn').innerHTML = icon('spark', 'spk') + (S.v && S.v.aiSong ? 'Ver a tradução' : 'Traduzir a música');
   $('#songTrBtn').classList.toggle('hidden', settings.lang === 'pt');
   $('#readyInfo').textContent = (settings.pace === 'flow'
     ? 'A música não para: responda enquanto o verso toca. Erros só aparecem no final.'
@@ -849,14 +849,14 @@ function sheetQuickSync() {
   };
   const render = () => {
     const ln = step === 1 ? first : later;
-    openSheet(`<h3>⚡ Sincronia rápida</h3>
+    openSheet(`<h3>Sincronia rápida</h3>
       <div class="qsstep">Passo ${step} de 2${step === 2 ? ' · opcional' : ''}</div>
       <p class="caption center-text" style="margin-top:4px">${step === 1 ? 'Toque em <b>AGORA</b> no instante em que a voz começar este verso:' : 'Para acertar também a velocidade, toque quando a voz começar este verso:'}</p>
       <div class="adjline qsline">${esc(ln.text)}</div>
       <div class="qsbox"><button class="markbtn" data-a="now"><span>AGORA</span></button></div>
-      <div class="chips center-row"><button class="chip" data-a="back">⏪ 5s</button><button class="chip" data-a="pp">⏯ Play/Pausa</button><button class="chip" data-a="fwd">5s ⏩</button></div>
+      <div class="chips center-row"><button class="chip" data-a="back">−5s</button><button class="chip" data-a="pp">Play/Pausa</button><button class="chip" data-a="fwd">+5s</button></div>
       <div class="sheetbtns">${step === 2 ? '<button class="btn" data-a="skip">Pular e salvar</button>' : ''}<button class="btn" data-a="cancel">Cancelar</button></div>
-      <p class="caption center-text">Perdeu o momento? Use ⏪ 5s e toque de novo.</p>`, {
+      <p class="caption center-text">Perdeu o momento? Volte 5s e toque de novo.</p>`, {
       now: () => {
         const t = player.getCurrentTime() - 0.2;   // average reaction time
         if (step === 1) { tap1 = t; step = 2; render(); cue(tap1 + (later.t - first.t) - 6); }
@@ -1011,7 +1011,7 @@ function sheetAdjustVerse(idx) {
     if (S.phase === 'karaoke') { markKarCur(); seekLyric(l.t - 0.8); player.playVideo(); return; }
     // replay the verse with its (new) timing: in Pause mode it stops again at the end, now in the right place
     S.hold = idx; S.cur = idx; seekLyric(l.t - 0.8); player.playVideo(); renderGame();
-    if (save) setStatus('⏱ Tempo do verso salvo', 'info');
+    if (save) setStatus('Tempo do verso salvo', 'info');
   };
   openSheet(`<h3>Ajustar tempo do verso</h3>
     <div class="adjline">${S.phase === 'play' ? lineHTML(line, false, false) : esc(line.text)}</div>
@@ -1059,7 +1059,7 @@ function applyVerseTiming(line, start, end) {
   else E.splice(j, 0, { t: end, text: '' });                      // a pause before the next verse: mark where this one ends
   E.sort((a, b) => a.t - b.t);
   saveSong(); retimeLines();
-  toast('⏱ Tempo do verso salvo');
+  toast('Tempo do verso salvo');
 }
 function buildGame() {
   const lines = buildLines();
@@ -1097,7 +1097,7 @@ async function startGame() {
   applyMode();
   $('#gSpeed').innerHTML = `<b>${settings.speed}x</b><span>Velocidade</span>`;
   if (S.lines[0]) translateLine(S.lines[0]);
-  setStatus('🎧 Ouça e complete!', 'info');
+  setStatus('Ouça e complete', 'info');
   player.seekTo(0, true); player.setPlaybackRate(settings.speed); player.playVideo();
   renderGame();
   window.scrollTo(0, 0);
@@ -1155,7 +1155,8 @@ function skipToLyrics() {
 }
 const lyricTime = () => player.getCurrentTime() + S.offset;
 const seekLyric = t => player.seekTo(Math.max(0, t - S.offset), true);
-function setStatus(msg, cls = '') { const el = $('#status'); el.textContent = msg; el.className = 'status ' + cls; }
+// feedback text goes to a screen-reader-only live region; on screen, colours, shakes and the ring already show it
+function setStatus(msg) { $('#status').textContent = msg; }
 function flash(cls) { const el = $('#lCur'); el.classList.remove('flash-ok', 'flash-bad'); void el.offsetWidth; el.classList.add(cls); }
 function setRing(frac) { $$('.replayBtn .ring circle').forEach(c => c.style.strokeDashoffset = 226 * (1 - Math.max(0, Math.min(1, frac)))); }
 
@@ -1216,7 +1217,7 @@ function tick() {
   const L = lyricTime();
   updateSkipIntro(L);
   if (S.phase === 'karaoke') return tickKaraoke(L);
-  $('#gAdj').classList.toggle('hot', !!S.waiting);   // paused for an answer: when a cut verse gets noticed
+  const adjBtn = $('#lCur .tradj'); if (adjBtn) adjBtn.classList.toggle('hot', !!S.waiting);   // paused for an answer: when a cut verse gets noticed
   if (settings.pace === 'flow') return tickFlow(L);
   const cur = S.lines[S.cur];
   if (cur && hasUnsolved(cur) && st === YT.PlayerState.PLAYING && L >= cur.end - 0.15 && L < cur.end + 1.5) { pauseForAnswer(); return; }
@@ -1227,7 +1228,7 @@ function tick() {
       if (w && cur) {
         const el = Date.now() - S.lastActivity;
         setRing(el / w);
-        if (el >= w) { setStatus('🔁 Ouvindo de novo…', 'info'); replayLine(); }
+        if (el >= w) { setStatus('Ouvindo de novo…', 'info'); replayLine(); }
       }
       return;
     }
@@ -1263,7 +1264,7 @@ function goBackVerse() {
   seekLyric(S.lines[target].t - 0.3);
   player.playVideo();
   enterLine(target);
-  setStatus(`⏮ Verso ${target + 1} de ${S.lines.length}`, 'info');
+  setStatus(`Verso ${target + 1} de ${S.lines.length}`, 'info');
 }
 function resume() { S.waiting = false; setRing(0); player.playVideo(); }
 
@@ -1326,7 +1327,7 @@ function submitAnswer(value) {
 function submitFlow(line, b, v, value) {
   if (v === 'exact' || v === 'close') {
     hitBlank(b);
-    setStatus(S.streak >= 3 ? `+1 · 🔥${S.streak} seguidas` : '+1', 'good');
+    setStatus(S.streak >= 3 ? `+1 · ${S.streak} seguidas` : '+1', 'good');
     answerFeedback(value, true);
     $('#answer').value = '';
   } else if (settings.mode === 'choice') {
@@ -1376,7 +1377,15 @@ function lineHTML(line, isCur, withTr) {
     else { const shown = b.answer.slice(0, b.hint); inner = `<span class="gap${b === act ? ' active' : ''}">${esc(shown)}${'_'.repeat(b.answer.length - shown.length)}</span>`; }
     return esc(tk.pre) + inner + esc(tk.post);
   }).join('');
-  if (withTr && settings.translate && settings.lang !== 'pt') h += `<div class="tr${isCur ? ' trcur' : ''}">${line.tr ? esc(line.tr) + `<span class="trbtns">${trFixBtn(`data-trfix="${S.lines.indexOf(line)}"`)}${trAiBtn(`data-trai="${S.lines.indexOf(line)}"`)}</span>` : isCur && !line.trFail ? '<span class="trwait">traduzindo…</span>' : ''}</div>`;
+  const idx = S.lines.indexOf(line);
+  // current verse: a clock icon next to ✎ / ✨ adjusts this verse's timing (cut-off verses)
+  const adj = isCur && S.phase === 'play' ? `<button class="tradj${S.waiting ? ' hot' : ''}" data-adj="${idx}" title="Ajustar o tempo deste verso" aria-label="Ajustar o tempo deste verso">${icon('sync')}</button>` : '';
+  const btns = inner => inner ? `<span class="trbtns">${inner}</span>` : '';
+  if (withTr && settings.translate && settings.lang !== 'pt') {
+    h += `<div class="tr${isCur ? ' trcur' : ''}">${line.tr
+      ? esc(line.tr) + btns(trFixBtn(`data-trfix="${idx}"`) + trAiBtn(`data-trai="${idx}"`) + adj)
+      : (isCur && !line.trFail ? '<span class="trwait">traduzindo…</span>' : '') + btns(adj)}</div>`;
+  } else if (adj) h += `<div class="tr trcur">${btns(adj)}</div>`;
   return h;
 }
 const DIRS = ['up', 'left', 'right', 'down'];
@@ -1384,13 +1393,18 @@ function renderGame() {
   if (S.phase !== 'play') return;
   const i = S.cur, L = S.lines;
   const prev = L[i - 1];
-  $('#lPrev').innerHTML = prev ? lineHTML(prev, false, true) + bmBtn(!!findPhrase(S.videoId, prev.text), `data-bm="${i - 1}"`) : '';
+  // previous-verse card: the player can fold it into a small pill (choice remembered, no Settings needed)
+  const showPrev = settings.showPrev !== false;
+  $('#lPrev').innerHTML = !prev ? '' : showPrev
+    ? `<button class="prevfold" data-prevtog title="Esconder verso anterior" aria-label="Esconder verso anterior">${icon('chev')}</button>`
+      + lineHTML(prev, false, true) + bmBtn(!!findPhrase(S.videoId, prev.text), `data-bm="${i - 1}"`)
+    : `<button class="prevpill" data-prevtog aria-label="Mostrar verso anterior">${icon('chev')}<span>Verso anterior</span></button>`;
   $('#lPrev').classList.toggle('empty', !prev);
+  $('#lPrev').classList.toggle('folded', !!prev && !showPrev);
   // a verse revisited with the back button shows its answers + translation (nothing left to answer)
   const revisit = i >= 0 && i < S.maxCur && !hasUnsolved(L[i]);
-  $('#lCur').innerHTML = i < 0 ? '<span class="muted">🎧 Prepare-se…</span>'
+  $('#lCur').innerHTML = i < 0 ? '<span class="muted">Prepare-se…</span>'
     : lineHTML(L[i], true, true) + (revisit ? ' ' + bmBtn(!!findPhrase(S.videoId, L[i].text), `data-bm="${i}" style="position:static;transform:none;display:inline-grid;vertical-align:middle"`) : '');
-  $('#gAdj').classList.toggle('hidden', i < 0);
   $('#gBack').disabled = S.cur <= 0 && S.backTarget == null;
   $('#gSkip').classList.toggle('hidden', settings.pace === 'flow');
   $('#hudOk').textContent = S.ok; $('#hudMiss').textContent = S.miss; $('#hudStreak').textContent = S.streak;
@@ -1408,17 +1422,26 @@ function renderGame() {
     });
   }
 }
+/* Automatic translation: MyMemory first; when it fails or its free daily quota runs out (HTTP 429 /
+   "MYMEMORY WARNING"), fall back to the alternative translator so no verse is left blank.
+   The quota state is remembered for a few hours so we don't hit the exhausted service for every verse. */
+let mmOffUntil = store.get('lg:mmOff', 0);
 async function fetchTr(text) {
   if (settings.lang === 'pt') return null;
   const key = trKey(text);
   if (lib.trOverride[key]) return lib.trOverride[key];
   if (trCache[key]) return trCache[key];
-  try {
-    const r = await fetchT('https://api.mymemory.translated.net/get?' + new URLSearchParams({ q: text, langpair: settings.lang + '|pt-BR' }));
-    const j = await r.json();
-    const tx = j && j.responseData && j.responseData.translatedText;
-    if (tx && !/MYMEMORY WARNING|INVALID/i.test(tx)) { trCache[key] = decode(tx); store.set('lg:tr', trCache); return trCache[key]; }
-  } catch { }
+  const keep = tx => { trCache[key] = tx; store.set('lg:tr', trCache); return tx; };
+  if (Date.now() > mmOffUntil) {
+    try {
+      const r = await fetchT('https://api.mymemory.translated.net/get?' + new URLSearchParams({ q: text, langpair: settings.lang + '|pt-BR' }));
+      const j = await r.json();
+      const tx = j && j.responseData && j.responseData.translatedText;
+      if (r.status === 429 || /MYMEMORY WARNING/i.test(tx || '')) { mmOffUntil = Date.now() + 6 * 3600e3; store.set('lg:mmOff', mmOffUntil); }
+      else if (tx && !/INVALID/i.test(tx)) return keep(decode(tx));
+    } catch { }
+  }
+  try { const g = await fetchGoogle(text, settings.lang); if (g) return keep(g); } catch { }
   return null;
 }
 async function translateLine(line, force = false) {
@@ -1472,12 +1495,12 @@ async function getAI() {
 }
 function aiErrorText(e) {
   const A = AnthropicSDK;
-  if (e && e.code === 'nokey') return 'Ative a tradução inteligente em ⚙ Configurações.';
+  if (e && e.code === 'nokey') return 'Ative a tradução inteligente em Configurações.';
   if (e && e.code === 'refusal') return 'Não foi possível gerar uma resposta para este trecho.';
   if (A) {   // most specific first; APIConnectionError is a subclass of APIError in the TS SDK
-    if (e instanceof A.AuthenticationError) return 'Chave de acesso inválida. Confira em ⚙ Configurações.';
+    if (e instanceof A.AuthenticationError) return 'Chave de acesso inválida. Confira em Configurações.';
     if (e instanceof A.PermissionDeniedError) return 'Esta chave não tem acesso a este recurso.';
-    if (e instanceof A.NotFoundError) return 'Modo indisponível para esta chave. Troque o modo em ⚙ Configurações.';
+    if (e instanceof A.NotFoundError) return 'Modo indisponível para esta chave. Troque o modo em Configurações.';
     if (e instanceof A.RateLimitError) return 'Limite de uso atingido. Tente de novo daqui a pouco.';
     if (e instanceof A.APIConnectionError) return 'Sem conexão. Verifique a internet.';
     if (e instanceof A.APIError) return 'Não foi possível concluir agora. Tente de novo em instantes.';
@@ -1513,9 +1536,9 @@ async function aiTranslateVerse(text) {
 }
 
 /* ✨ button next to every translation: translate this verse with Claude, save it, show the note */
-const trAiBtn = attrs => `<button class="trai" ${attrs} title="Tradução inteligente" aria-label="Tradução inteligente">✨</button>`;
+const trAiBtn = attrs => `<button class="trai" ${attrs} title="Tradução inteligente" aria-label="Tradução inteligente">${icon('spark')}</button>`;
 function sheetNoKey(after) {
-  openSheet(`<h3>✨ Tradução inteligente</h3>
+  openSheet(`<h3>${icon('spark', 'h3i')}Tradução inteligente</h3>
     <p class="caption center-text" style="margin-top:0">A tradução inteligente usa a Claude. Cole sua chave de acesso para ativar; ela fica guardada só neste aparelho.</p>
     <input id="aiKeyQuick" type="password" placeholder="sk-ant-…" autocapitalize="off" autocorrect="off" spellcheck="false">
     <button class="btn primary wide" data-a="save">Salvar e continuar</button>
@@ -1535,7 +1558,7 @@ function sheetAiTr(text, lang, after) {
   const wasPlaying = inSession() && playerReady && player.getPlayerState() === YT.PlayerState.PLAYING;
   if (wasPlaying) player.pauseVideo();
   const finish = () => { closeSheet(); if (wasPlaying) player.playVideo(); if (after) after(); };
-  openSheet(`<h3>✨ Tradução inteligente</h3>
+  openSheet(`<h3>${icon('spark', 'h3i')}Tradução inteligente</h3>
     <div class="adjline">${esc(text)}</div>
     <div id="aiTrBox" class="aibox"></div>
     <div class="sheetbtns"><button class="btn" data-a="again" id="aiAgain">Traduzir de novo</button><button class="btn hidden" data-a="undo" id="aiUndo">Desfazer</button><button class="btn primary" data-a="ok">OK</button></div>`, {
@@ -1632,7 +1655,7 @@ function sheetTranslateSong(force = false) {
   if (wasPlaying) player.pauseVideo();
   const close = () => { closeSheet(); if (wasPlaying) player.playVideo(); if (S.phase === 'play') renderGame(); if (S.phase === 'karaoke') S.lines.forEach((_, i) => paintKarLine(i)); if (S.phase === 'ready') renderReady(); };
   const n = songVerses().length;
-  openSheet(`<h3>✨ Tradução da música</h3>
+  openSheet(`<h3>${icon('spark', 'h3i')}Tradução da música</h3>
     <p class="caption center-text" style="margin-top:0">${esc(v.title || '')}${v.author ? ' · ' + esc(v.author) : ''}</p>
     <div id="songTrBox">${ready ? `<ul class="songtr">${songTrListHTML()}</ul>` : `<div class="aibox"><span class="trwait">Traduzindo ${n} versos com o contexto da música toda…</span></div>`}</div>
     <div class="sheetbtns"><button class="btn" data-a="again" id="stAgain" ${ready ? '' : 'disabled'}>Traduzir de novo</button><button class="btn primary" data-a="ok">Fechar</button></div>
@@ -1687,7 +1710,7 @@ function sheetExplain(force = false) {
   const wasPlaying = inSession() && playerReady && player.getPlayerState() === YT.PlayerState.PLAYING;
   if (wasPlaying) player.pauseVideo();
   const cached = !force && v.explain;
-  openSheet(`<h3>✨ Entender a música</h3>
+  openSheet(`<h3>${icon('spark', 'h3i')}Entender a música</h3>
     <p class="caption center-text" style="margin-top:0">${esc(v.title || '')}${v.author ? ' · ' + esc(v.author) : ''}</p>
     <div id="explainBox" class="explain">${cached ? mdLite(v.explain) : '<span class="trwait">Lendo a letra…</span>'}</div>
     <div class="sheetbtns"><button class="btn" data-a="again" id="exAgain" ${cached ? '' : 'disabled'}>Gerar de novo</button><button class="btn primary" data-a="ok">Fechar</button></div>
@@ -1739,7 +1762,7 @@ function sheetFixTr(text, lang, after) {
     <p class="caption center-text" style="margin-top:4px">Toque na tradução que faz mais sentido. Ela fica salva para este verso.</p>
     ${choice('auto', 'Tradução automática', auto, 'sem tradução')}
     ${choice('google', 'Tradução alternativa', null, '<span class="trwait">buscando…</span>')}
-    <button class="tropt aiopt" data-a="ai"><small>✨ Tradução inteligente</small><span>Considera a música inteira e explica gírias e expressões</span></button>
+    <button class="tropt aiopt" data-a="ai"><small>${icon('spark', 'ii')} Tradução inteligente</small><span>Considera a música inteira e explica gírias e expressões</span></button>
     <div class="tropt mine${mine && mine === cur ? ' on' : ''}"><small>Minha tradução${mine ? ' · em uso' : ''}</small>
       <textarea id="trMine" rows="2" placeholder="Escreva com suas palavras…">${esc(mine)}</textarea>
       <button class="btn primary wide" data-a="mine" style="margin-top:8px">Usar a minha</button></div>
@@ -1780,7 +1803,7 @@ async function toggleSavePhrase(line) {
     id: uid(), videoId: S.videoId, title: S.v.title, author: S.v.author, text: line.text, tr: line.tr || null, lang: settings.lang,
     start: Math.max(0, line.t - S.offset - 0.4), end: line.end - S.offset + 0.4, savedAt: Date.now()
   };
-  lib.phrases.unshift(p); saveLib(); toast('🔖 Frase salva');
+  lib.phrases.unshift(p); saveLib(); toast('Frase salva');
   renderGame();
   if (!p.tr) { const tr = await fetchTr(p.text); if (tr) { p.tr = tr; line.tr = line.tr || tr; saveLib(); } }
   return true;
@@ -1831,7 +1854,7 @@ function showResults(completed) {
   saveLib();
   const missed = all.filter(x => x.b.missed || x.b.attempts > 0);
   const hasNext = S.queue && S.queue.idx + 1 < S.queue.ids.length;
-  openSheet(`<h3>${completed ? '🎉 Fim da música!' : 'Música encerrada'}</h3>
+  openSheet(`<h3>${completed ? 'Fim da música' : 'Música encerrada'}</h3>
     <div class="stats four">
       <div><b>${S.score}</b><span>pontos</span></div>
       <div><b class="okc">${S.ok}</b><span>certas</span></div>
@@ -1841,13 +1864,13 @@ function showResults(completed) {
     <div class="scoreline">
       <span>${S.ok} palavra${S.ok === 1 ? '' : 's'} × 1</span>
       <span>${completed ? `música completa <b>+${SONG_BONUS}</b>` : `sem bônus (encerrada ${S.lines.length ? Math.round((S.cur + 1) / S.lines.length * 100) : 0}%)`}</span>
-      <span>🔥 melhor sequência <b>${S.bestStreak}</b></span>
-      <span>${newBest ? '🏆 <b>novo recorde!</b>' : `recorde <b>${S.v.best || '—'}</b>`}</span>
+      <span>${icon('flame', 'ii')} melhor sequência <b>${S.bestStreak}</b></span>
+      <span>${newBest ? '<b>Novo recorde</b>' : `recorde <b>${S.v.best || '—'}</b>`}</span>
     </div>
     ${(() => { const t = todayStats(), lv = levelOf(xpOf(lib.stats)), sk = dayStreak(); return `<div class="todayline"><span>Hoje <b>${t.words}/${settings.goal}</b> palavras</span><span>🔥 <b>${sk}</b> dia${sk === 1 ? "" : "s"}</span><span>Nível <b>${lv.level}</b></span></div>`; })()}
-    ${missed.length ? `<p class="muted">Palavras para revisar · 🔖 salva a frase</p><ul class="missed">${missed.map(x => `<li><div><b>${esc(x.b.answer)}</b> · ${esc(x.l.text)}${x.l.tr ? `<div class="tr">${esc(x.l.tr)}</div>` : ''}</div>${bmBtn(!!findPhrase(S.videoId, x.l.text), `data-a="bm" data-i="${S.lines.indexOf(x.l)}" style="position:static;transform:none"`)}</li>`).join('')}</ul>` : played.length ? '<p class="muted" style="text-align:center">Nenhum erro! 🏆</p>' : ''}
+    ${missed.length ? `<p class="muted">Palavras para revisar · toque em ${icon('bm', 'ii')} para salvar a frase</p><ul class="missed">${missed.map(x => `<li><div><b>${esc(x.b.answer)}</b> · ${esc(x.l.text)}${x.l.tr ? `<div class="tr">${esc(x.l.tr)}</div>` : ''}</div>${bmBtn(!!findPhrase(S.videoId, x.l.text), `data-a="bm" data-i="${S.lines.indexOf(x.l)}" style="position:static;transform:none"`)}</li>`).join('')}</ul>` : played.length ? '<p class="muted" style="text-align:center">Nenhum erro! 🏆</p>' : ''}
     <div class="sheetbtns" style="flex-direction:column">
-      ${hasNext ? '<button class="btn primary" data-a="next">Próxima música ▶</button>' : ''}
+      ${hasNext ? '<button class="btn primary" data-a="next">Próxima música</button>' : ''}
       <button class="btn ${hasNext ? '' : 'primary'}" data-a="again">Jogar de novo</button>
       <button class="btn" data-a="close">Fechar</button>
     </div>`, {
@@ -1927,7 +1950,7 @@ function karaokeBack() {
 }
 function karaokeEnd() {
   S.finished = true;
-  openSheet(`<h3>🎤 Fim do karaokê!</h3>
+  openSheet(`<h3>Fim do karaokê</h3>
     <p class="muted" style="text-align:center;margin:0 0 6px">Agora que você conhece a letra, que tal completar as lacunas?</p>
     <div class="sheetbtns" style="flex-direction:column">
       <button class="btn primary" data-a="game">Jogar com lacunas</button>
@@ -1982,7 +2005,7 @@ function sheetSettings() {
     <div class="grouplabel">Tradução inteligente</div>
     <input id="claudeKey" type="password" placeholder="Chave de acesso da Claude" value="${esc(settings.claudeKey)}" autocapitalize="off" autocorrect="off" spellcheck="false">
     <div class="field"><label>Modo</label>${seg('aiModel', AI_MODELS, settings.aiModel)}</div>
-    <p class="caption" style="margin-top:6px">Ativa o ✨ ao lado das traduções e o <b>Entender a música</b>. A chave fica guardada só neste aparelho e não entra no backup. Recomendamos definir um limite de gastos para ela.</p>
+    <p class="caption" style="margin-top:6px">Ativa o ${icon('spark', 'ii')} ao lado das traduções e o <b>Entender a música</b>. A chave fica guardada só neste aparelho e não entra no backup. Recomendamos definir um limite de gastos para ela.</p>
 
     <div class="grouplabel">Avançado</div>
     <input id="ytKey" placeholder="Chave do YouTube (opcional)" value="${esc(settings.ytKey)}" autocapitalize="off" autocorrect="off" spellcheck="false">
@@ -2033,13 +2056,13 @@ function sheetSongMore() {
     <div class="group">
       <button class="grow" data-a="pl">${icon('addlist')}<span>Adicionar à playlist</span></button>
       <button class="grow" data-a="yt">${icon('ext')}<span>Abrir no YouTube</span></button>
-      ${has ? `<button class="grow" data-a="songtr"><span class="aiico">✨</span><span>${v.aiSong ? 'Ver a tradução da música' : 'Traduzir a música toda'}<small>Todos os versos, com as gírias explicadas</small></span></button>
-      <button class="grow" data-a="explain"><span class="aiico">✨</span><span>Entender a música<small>Resumo, sentido e expressões da letra</small></span></button>` : ''}
+      ${has ? `<button class="grow" data-a="songtr">${icon('spark', 'aiico')}<span>${v.aiSong ? 'Ver a tradução da música' : 'Traduzir a música toda'}<small>Todos os versos, com as gírias explicadas</small></span></button>
+      <button class="grow" data-a="explain">${icon('spark', 'aiico')}<span>Entender a música<small>Resumo, sentido e expressões da letra</small></span></button>` : ''}
     </div>
     <div class="grouplabel">Letra</div>
     <div class="group">
       ${has ? `<button class="grow" data-a="kar">${icon('note')}<span>Modo karaokê<small>A letra rola junto com a música, com tradução</small></span></button>
-      <button class="grow" data-a="quick"><span class="aiico">⚡</span><span>Sincronia rápida<small>Letra fora de tempo? Acerte com 1 ou 2 toques</small></span></button>
+      <button class="grow" data-a="quick">${icon('sync')}<span>Sincronia rápida<small>Letra fora de tempo? Acerte com 1 ou 2 toques</small></span></button>
       <button class="grow" data-a="resync">${icon('sync')}<span>Sincronizar de novo<small>Marcar o tempo de cada frase outra vez</small></span></button>
       <button class="grow" data-a="edit">${icon('edit')}<span>Editar letra<small>Corrigir o texto ou os tempos</small></span></button>` : ''}
       <button class="grow" data-a="change">${icon('text')}<span>${has ? 'Trocar letra' : 'Buscar ou colar letra'}</span></button>
@@ -2143,6 +2166,9 @@ $('#playBtn').onclick = startGame;
   $$(sel + ' button').forEach(b => b.onclick = () => applySetting(key, b.dataset.v)));
 
 ['#lPrev', '#lCur'].forEach(sel => $(sel).addEventListener('click', e => {
+  if (e.target.closest('[data-prevtog]')) { settings.showPrev = settings.showPrev === false; saveSettings(); renderGame(); return; }
+  const adj = e.target.closest('[data-adj]');
+  if (adj) { sheetAdjustVerse(+adj.dataset.adj); return; }
   const ai = e.target.closest('[data-trai]');
   if (ai) { const l = S.lines[+ai.dataset.trai]; if (l) sheetAiTr(l.text, settings.lang, renderGame); return; }
   const t = e.target.closest('[data-trfix]');
@@ -2152,7 +2178,7 @@ $('#playBtn').onclick = startGame;
 $('#gBack').onclick = goBackVerse;
 $('#answerForm').onsubmit = e => { e.preventDefault(); submitAnswer($('#answer').value); };
 $$('#pad .opt').forEach(btn => btn.onclick = () => { if (btn.textContent && Date.now() >= padFreezeUntil) submitAnswer(btn.textContent); });
-$$('.replayBtn').forEach(b => b.onclick = () => { setStatus('🔁 Ouvindo de novo…', 'info'); replayLine(); });
+$$('.replayBtn').forEach(b => b.onclick = () => { setStatus('Ouvindo de novo…', 'info'); replayLine(); });
 $('#gHint').onclick = giveHint;
 $('#gSkip').onclick = skipBlank;
 $('#gPause').onclick = () => { if (S.waiting) return replayLine(); player.getPlayerState() === YT.PlayerState.PLAYING ? player.pauseVideo() : player.playVideo(); };
@@ -2162,7 +2188,6 @@ $('#gSpeed').onclick = cycleSpeed;
 $('#gQuit').onclick = confirmQuit;
 $('#gSet').onclick = sheetSettings;
 $('#skipIntro').onclick = skipToLyrics;
-$('#gAdj').onclick = () => sheetAdjustVerse(S.cur);
 
 $('#karBtn').onclick = startKaraoke;
 $('#explainBtn').onclick = () => sheetExplain();

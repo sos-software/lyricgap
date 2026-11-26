@@ -7,13 +7,16 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Versa">
-<meta name="theme-color" content="#0b0b14">
+<meta name="theme-color" content="#121015">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <title>Versa</title>
 <meta name="author" content="Sóstenes Rondena">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body data-view="home">
@@ -47,6 +50,8 @@
     <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
     <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6h14M5 11h14M5 16h9" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
     <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V6l10-2v12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/><circle cx="6.5" cy="18" r="2.5" fill="currentColor"/><circle cx="16.5" cy="16" r="2.5" fill="currentColor"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.4 1.3-3.9 2.5-5 .2 1.6 1 2.6 2 3 0-3 .2-5.3.5-8z" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"/></symbol>
+    <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18.5 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" fill="currentColor"/></symbol>
     <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.9"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
     <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   </defs>
@@ -57,7 +62,7 @@
 <!-- ================= HOME (tabs) ================= -->
 <section id="home" class="view">
   <header class="apphead">
-    <div class="logo" id="homeLogo"><img class="mark" src="icons/icon.svg" alt=""><span class="lname">Vers<span class="grad">a</span></span></div>
+    <div class="logo" id="homeLogo"><img class="mark" src="icons/icon.svg" alt=""><span class="lname">versa</span></div>
     <h1 id="headTitle" class="hidden"></h1>
     <button class="iconbtn" id="btnSettings" aria-label="Configurações"><svg><use href="#i-gear"/></svg></button>
   </header>
@@ -167,8 +172,8 @@
     </div>
     <p class="caption center-text">Karaokê: a letra rola junto com a música, com a tradução ao lado. Sem lacunas e sem pontos.</p>
     <div class="airow">
-      <button class="btn tonal" id="songTrBtn">✨ Traduzir a música</button>
-      <button class="btn tonal" id="explainBtn">✨ Entender a música</button>
+      <button class="btn tonal" id="songTrBtn"><svg class="spk"><use href="#i-spark"/></svg>Traduzir a música</button>
+      <button class="btn tonal" id="explainBtn"><svg class="spk"><use href="#i-spark"/></svg>Entender a música</button>
     </div>
   </div>
 
@@ -178,7 +183,7 @@
       <button class="endbtn" id="kQuit"><svg><use href="#i-close"/></svg>Encerrar</button>
       <span class="grow1"></span>
       <button class="chip" id="kTr">Tradução ao lado</button>
-      <button class="iconbtn sm kai" id="kAiSong" aria-label="Tradução inteligente da música" title="Tradução inteligente da música">✨</button>
+      <button class="iconbtn sm kai" id="kAiSong" aria-label="Tradução inteligente da música" title="Tradução inteligente da música"><svg><use href="#i-spark"/></svg></button>
       <button class="iconbtn sm" id="kSet" aria-label="Configurações"><svg><use href="#i-gear"/></svg></button>
     </div>
     <div class="bar thin"><div id="kProgress"></div></div>
@@ -198,16 +203,16 @@
       <span class="grow1"></span>
       <div class="pill okp" title="Palavras certas">✓<b id="hudOk">0</b></div>
       <div class="pill badp" title="Erros">✗<b id="hudMiss">0</b></div>
-      <div class="pill" title="Acertos seguidos">🔥<b id="hudStreak">0</b></div>
+      <div class="pill" title="Acertos seguidos"><svg class="pi"><use href="#i-flame"/></svg><b id="hudStreak">0</b></div>
       <button class="iconbtn sm" id="gSet" aria-label="Configurações"><svg><use href="#i-gear"/></svg></button>
     </div>
     <div class="bar thin"><div id="progress"></div></div>
     <div class="lyrics game">
       <div id="lPrev" class="prevcard empty"></div>
       <div id="lCur" class="line cur"></div>
-      <div class="adjwrap"><button id="gAdj" class="adjbtn hidden"><svg><use href="#i-sync"/></svg><span>Verso cortado? Ajustar tempo</span></button></div>
     </div>
-    <div id="status" class="status"></div>
+    <!-- feedback text is announced to screen readers only; on screen the buttons, colours and ring already say it -->
+    <div id="status" class="status sr-only" role="status" aria-live="polite"></div>
 
     <div id="pad" class="pad">
       <button class="opt up" data-k="0"></button>
