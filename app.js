@@ -1563,25 +1563,73 @@ const songContext = () => {
 };
 const textOf = msg => msg.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
 
-const AI_TR_SYSTEM = `Você ajuda brasileiros a aprender idiomas com músicas. Traduza para o português do Brasil o verso pedido, de forma natural e fiel ao sentido na música (não palavra por palavra): gírias, expressões idiomáticas, duplo sentido e referências culturais devem virar o equivalente que um brasileiro entenderia.
-Responda exatamente neste formato, sem nada antes ou depois:
-TRADUÇÃO: <a tradução do verso, em uma linha>
-NOTA: <uma ou duas frases curtas explicando gíria, expressão ou referência do verso que ajudem a entender; escreva - se não houver nada a explicar>`;
+/* The note teaches the language, it doesn't justify the translation. It used to be optional ("only if there is
+   something to explain"), so when the translation already sounded natural ("não me coloque de lado") the model left
+   out the idiom behind it ("put on the back burner"). Now every non-literal expression is listed as a term, even when
+   the translation is good, and the terms come back as a list so the model checks each verse. */
+const AI_TERMS_RULES = `A explicação serve para ENSINAR o idioma, não para justificar a tradução. Em "terms", liste cada trecho do verso que um brasileiro de nível intermediário não entenderia traduzindo palavra por palavra:
+- expressões idiomáticas e metáforas fixas (ex.: put something on the back burner, break the ice, a piece of cake);
+- phrasal verbs com sentido próprio (ex.: bring yourself down, give up, let someone down, figure out);
+- gírias, contrações e formas da fala (ex.: gonna, wanna, ain't, y'all);
+- referências culturais, nomes, lugares, trocadilhos e duplo sentido.
+Liste o termo MESMO QUANDO a tradução já estiver natural e correta: é exatamente nesse caso que o aluno não percebe que havia uma expressão ali. Um verso pode ter vários termos.
+Não liste palavras comuns de sentido literal (love, night, heart, run) nem tempos verbais simples.
+Para cada termo: "expr" é o trecho como aparece no verso, na forma base quando ajudar (ex.: put (someone) on the back burner); "meaning" explica em poucas palavras o sentido em português e, quando a imagem literal ajudar a memorizar, acrescenta "(literalmente: ...)".
+Se o verso não tiver nada assim, devolva "terms" vazio.
+
+Exemplos (versos inventados):
+Verso: Don't leave my heart on the back burner
+tr: Não deixe meu coração em segundo plano
+terms: [{"expr": "leave/put (something) on the back burner", "meaning": "deixar em segundo plano, adiar (literalmente: na boca de trás do fogão, onde fica a panela que pode esperar)"}]
+
+Verso: You're gonna let yourself down again
+tr: Você vai se decepcionar de novo
+terms: [{"expr": "gonna", "meaning": "forma falada de going to (vai)"}, {"expr": "let (someone) down", "meaning": "decepcionar alguém; com yourself, decepcionar a si mesmo"}]
+
+Verso: The night is cold and I am alone
+tr: A noite está fria e eu estou sozinho
+terms: []`;
+const AI_TERMS_SCHEMA = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: { expr: { type: 'string' }, meaning: { type: 'string' } },
+    required: ['expr', 'meaning'],
+    additionalProperties: false
+  }
+};
+/* note -> "Entenda:" block; one expression per line (older notes are a single sentence and stay inline) */
+const noteHTML = note => {
+  const items = String(note || '').split('\n').map(x => x.trim()).filter(Boolean);
+  if (!items.length) return '';
+  return items.length === 1 ? `<b>Entenda:</b> ${esc(items[0])}` : `<b>Entenda:</b><ul class="terms">${items.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`;
+};
+/* terms -> the note string saved per verse (one expression per line) */
+const termsNote = terms => (terms || []).filter(t => t && t.expr && t.meaning)
+  .map(t => `“${t.expr.trim().replace(/^["“]|["”]$/g, '')}” = ${t.meaning.trim()}`).join('\n');
+
+const AI_TR_SYSTEM = `Você ajuda brasileiros a aprender idiomas com músicas. Traduza para o português do Brasil o verso pedido, de forma natural e fiel ao sentido na música (não palavra por palavra): gírias, expressões idiomáticas, duplo sentido e referências culturais devem virar o equivalente que um brasileiro entenderia. Devolva a tradução do verso em uma linha (tr) e os termos (terms).
+
+${AI_TERMS_RULES}`;
+const AI_TR_SCHEMA = {
+  type: 'object',
+  properties: { tr: { type: 'string' }, terms: AI_TERMS_SCHEMA },
+  required: ['tr', 'terms'],
+  additionalProperties: false
+};
 async function aiTranslateVerse(text) {
   const ai = await getAI();
   const msg = await ai.messages.create({
     model: settings.aiModel,
-    max_tokens: 1024,
-    output_config: { effort: 'low' },   // short, well-defined task
+    max_tokens: 2048,
+    // medium: spotting idioms that a natural translation hides needs a moment of judgment
+    output_config: { effort: 'medium', format: { type: 'json_schema', schema: AI_TR_SCHEMA } },
     system: AI_TR_SYSTEM,
     messages: [{ role: 'user', content: `${S.entries.length ? songContext() + '\n\n' : ''}Verso para traduzir:\n${text}` }]
   });
   if (msg.stop_reason === 'refusal') { const e = new Error('refusal'); e.code = 'refusal'; throw e; }
-  const out = textOf(msg);
-  const tr = (out.match(/TRADU[ÇC][ÃA]O:\s*(.+)/i) || [])[1] || out.split('\n')[0];
-  let note = ((out.match(/NOTA:\s*([\s\S]+)/i) || [])[1] || '').trim();
-  if (/^[-–—]?$/.test(note)) note = '';
-  return { tr: tr.trim().replace(/^["“]|["”]$/g, ''), note };
+  const data = JSON.parse(textOf(msg));
+  return { tr: String(data.tr || '').trim().replace(/^["“]|["”]$/g, ''), note: termsNote(data.terms) };
 }
 
 /* ✨ button next to every translation: translate this verse with Claude, save it, show the note */
@@ -1620,7 +1668,7 @@ function sheetAiTr(text, lang, after) {
   }, () => { if (wasPlaying) player.playVideo(); if (after) after(); });
   const show = (tr, note, label) => {
     const box = $('#aiTrBox'); if (!box) return;
-    box.innerHTML = `<div class="aitr">${esc(tr)}</div>${note ? `<div class="ainote"><b>Entenda:</b> ${esc(note)}</div>` : ''}<small class="aisaved">${label}</small>`;
+    box.innerHTML = `<div class="aitr">${esc(tr)}</div>${note ? `<div class="ainote">${noteHTML(note)}</div>` : ''}<small class="aisaved">${label}</small>`;
   };
   const run = () => {
     const box = $('#aiTrBox'); if (!box) return;
@@ -1645,7 +1693,9 @@ function sheetAiTr(text, lang, after) {
 
 /* "✨ Traduzir a música toda": one request translates every distinct verse (with notes) and applies it to all lines */
 const AI_SONG_SYSTEM = `Você ajuda brasileiros a aprender idiomas com músicas. Traduza para o português do Brasil cada verso numerado da letra, de forma natural e fiel ao sentido na música (não palavra por palavra): gírias, expressões idiomáticas, duplo sentido e referências culturais devem virar o equivalente que um brasileiro entenderia. Mantenha coerência entre os versos, já que você vê a música inteira.
-Para cada verso, devolva o número (n), a tradução (tr) e uma nota (note) com uma ou duas frases curtas explicando gíria, expressão ou referência daquele verso; deixe note vazia ("") quando não houver nada a explicar. Traduza todos os versos, na ordem.`;
+Para cada verso, devolva o número (n), a tradução (tr) e os termos (terms). Traduza todos os versos, na ordem, e procure os termos em cada um deles: não economize nos versos do meio nem do fim.
+
+${AI_TERMS_RULES}`;
 const AI_SONG_SCHEMA = {
   type: 'object',
   properties: {
@@ -1653,8 +1703,8 @@ const AI_SONG_SCHEMA = {
       type: 'array',
       items: {
         type: 'object',
-        properties: { n: { type: 'integer' }, tr: { type: 'string' }, note: { type: 'string' } },
-        required: ['n', 'tr', 'note'],
+        properties: { n: { type: 'integer' }, tr: { type: 'string' }, terms: AI_TERMS_SCHEMA },
+        required: ['n', 'tr', 'terms'],
         additionalProperties: false
       }
     }
@@ -1677,11 +1727,11 @@ async function aiTranslateSong() {
   if (msg.stop_reason === 'max_tokens') { const e = new Error('Letra longa demais para traduzir de uma vez'); e.code = 'toolong'; throw e; }
   const data = JSON.parse(textOf(msg));
   let done = 0;
-  (data.lines || []).forEach(({ n, tr, note }) => {
+  (data.lines || []).forEach(({ n, tr, terms }) => {
     const text = verses[n - 1];
     if (!text || !tr || !tr.trim()) return;
     setTranslation(text, settings.lang, tr.trim(), true);
-    lib.aiNotes[trKey(text, settings.lang)] = (note || '').trim();
+    lib.aiNotes[trKey(text, settings.lang)] = termsNote(terms);
     done++;
   });
   S.v.aiSong = done >= verses.length * 0.8;   // nearly all verses covered
@@ -1691,7 +1741,7 @@ async function aiTranslateSong() {
 function songTrListHTML() {
   return songVerses().map(text => {
     const k = trKey(text, settings.lang), tr = lib.trOverride[k] || trCache[k] || '', note = lib.aiNotes[k];
-    return `<li><span class="so">${esc(text)}</span>${tr ? `<span class="st">${esc(tr)}</span>` : ''}${note ? `<span class="sn"><b>Entenda:</b> ${esc(note)}</span>` : ''}</li>`;
+    return `<li><span class="so">${esc(text)}</span>${tr ? `<span class="st">${esc(tr)}</span>` : ''}${note ? `<span class="sn">${noteHTML(note)}</span>` : ''}</li>`;
   }).join('');
 }
 function sheetTranslateSong(force = false) {

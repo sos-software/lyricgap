@@ -580,3 +580,4 @@ body.playing #song{padding-top:var(--st)}
 .prevpill svg{width:13px;height:13px;transform:rotate(90deg)}
 .prevpill:active{color:var(--text)}
 .suggesthead .flag{font-size:18px;line-height:1}
+.ainote .terms,.songtr .sn .terms{margin:4px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
