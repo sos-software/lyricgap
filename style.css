@@ -492,3 +492,6 @@ body.playing #song{padding-top:var(--st)}
 .songtr .st{font-size:15.5px;font-weight:600;color:var(--text);line-height:1.4}
 .songtr .sn{font-size:13px;color:var(--text2);line-height:1.45}
 .songtr .sn b{color:#c4b5fd}
+.suggesthead{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--text2);margin:16px 2px 8px;text-transform:uppercase;letter-spacing:.5px}
+.suggesthead span{font-size:17px}
+.suggest button{font-size:13.5px;padding:9px 13px}

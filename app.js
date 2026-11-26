@@ -112,7 +112,9 @@ const trKey = (text, lang = settings.lang) => lang + '|' + text;
 const trOf = (text, lang) => lib.trOverride[trKey(text, lang)] || trCache[trKey(text, lang)] || null;
 
 const STOP = new Set(('the a an and or but of to in on at for is it its i you me my we he she they them his her our your be am are was were ' +
-  'do did does so as if no not oh ooh ah uh yeah hey la na da o e de do um uma que en el los las y se mi tu te le les du un une et je il').split(' '));
+  'do did does so as if no not oh ooh ah uh yeah hey la na da o e de do um uma que en el los las y se mi tu te le les du un une et je il ' +
+  'ich du und die der das ist ein eine zu es il di che non mi ti per ' +
+  'の が は を に で と も へ や か ね よ な だ て た し' /* Japanese particles / endings */).split(' '));
 
 /* ================= state ================= */
 let player = null, apiReady = false, playerReady = false, pendingId = null, wakeLock = null;
@@ -304,7 +306,16 @@ function renderHomeTab() {
   }
 }
 
-const SUGGEST = ['Músicas fáceis em inglês', 'Acoustic covers', 'Ed Sheeran', 'Adele', 'Coldplay', 'Bruno Mars', 'The Beatles', 'Taylor Swift', 'Shakira', 'Músicas em espanhol'];
+// search suggestions: recent hits by language (each chip runs that search)
+const SUGGEST = [
+  ['🇺🇸', 'Inglês', ['Billie Eilish Birds of a Feather', 'Sabrina Carpenter Espresso', 'Lady Gaga Bruno Mars Die With A Smile', 'Ed Sheeran Perfect']],
+  ['🇪🇸', 'Espanhol', ['Bad Bunny DtMF', 'Shakira Soltera', 'Karol G Si Antes Te Hubiera Conocido', 'Karol G Shakira TQG']],
+  ['🇫🇷', 'Francês', ['Aya Nakamura Djadja', 'Stromae Papaoutai', 'ZAZ Je veux', 'Indila Dernière danse']],
+  ['🇩🇪', 'Alemão', ['Peter Fox Zukunft Pink', 'Nina Chuba Wildberry Lillet', 'Apache 207 Roller', 'Sido Astronaut']],
+  ['🇯🇵', 'Japonês', ['YOASOBI Idol', 'Creepy Nuts Bling-Bang-Bang-Born', 'Fujii Kaze Shinunoga E-Wa', 'Kenshi Yonezu Lemon']],
+  ['🇰🇷', 'Coreano', ['NewJeans Ditto', 'aespa Supernova', 'IVE Love Dive', 'BTS Spring Day']],
+  ['🇮🇹', 'Italiano', ['Måneskin Zitti e buoni', 'Mahmood Soldi', 'Laura Pausini La soledad']]
+];
 function renderSearchTab() {
   const box = $('#searchList'); box.innerHTML = '';
   const filt = el('div', 'seg small searchfilt', `<button data-v="1" class="${settings.musicOnly ? 'on' : ''}">${icon('note')}Músicas</button><button data-v="0" class="${settings.musicOnly ? '' : 'on'}">Todos os vídeos</button>`);
@@ -315,10 +326,13 @@ function renderSearchTab() {
   });
   box.appendChild(filt);
   if (!H.results) {
-    const s = el('div', ''); s.appendChild(el('div', 'sectionhead', '<h2 style="font-size:17px">Sugestões</h2>'));
-    const wrap = el('div', 'suggest');
-    SUGGEST.forEach(q => { const b = el('button', '', esc(q)); b.onclick = () => { $('#q').value = q; doSearch(q); }; wrap.appendChild(b); });
-    s.appendChild(wrap);
+    const s = el('div', ''); s.appendChild(el('div', 'sectionhead', '<h2 style="font-size:17px">Sucessos para praticar</h2>'));
+    SUGGEST.forEach(([flag, name, songs]) => {
+      s.appendChild(el('div', 'suggesthead', `<span>${flag}</span>${esc(name)}`));
+      const wrap = el('div', 'suggest');
+      songs.forEach(q => { const b = el('button', '', esc(q)); b.onclick = () => { $('#q').value = q; doSearch(q); }; wrap.appendChild(b); });
+      s.appendChild(wrap);
+    });
     s.appendChild(el('p', 'caption', 'Dica: você também pode colar o link de um vídeo do YouTube na busca.'));
     box.appendChild(s);
     return;
@@ -746,7 +760,41 @@ function setEntries(entries, save) {
   if (!entries || !entries.length) return;
   S.entries = entries;
   if (save) saveSong();
+  applySongLang();
   S.phase = 'ready'; showPane('pReady'); renderReady();
+}
+
+/* ---------- song language: detected from the lyrics, saved per song, editable in Settings ---------- */
+const LANG_WORDS = {
+  en: "the you and i to my me it is in that your on be love all do we so don't i'm what like",
+  es: 'el la que de y en no me tu te lo mi es por un una con para yo amor como pero',
+  fr: "je tu le la les de et que pas un une est mon ma moi des il elle on c'est j'ai mais",
+  it: 'il la che di e non mi ti un una per sono io amore come ma con questo',
+  de: 'ich du und die der das nicht ist mich mir ein eine zu wir es dich auf mit',
+  pt: 'eu você que não de e o a do da meu minha com pra tu um uma é mas'
+};
+const LANG_SETS = Object.fromEntries(Object.entries(LANG_WORDS).map(([k, v]) => [k, new Set(v.split(' '))]));
+function detectLang(lines) {
+  const txt = lines.join('\n');
+  if (/[぀-ヿ]/.test(txt)) return 'ja';       // hiragana / katakana
+  if (/[가-힯]/.test(txt)) return 'ko';       // hangul
+  const words = txt.toLowerCase().replace(/[’‘]/g, "'").split(/[^\p{L}']+/u).filter(Boolean);
+  const score = Object.fromEntries(Object.keys(LANG_SETS).map(k => [k, 0]));
+  words.forEach(w => { for (const k in LANG_SETS) if (LANG_SETS[k].has(w)) score[k]++; });
+  const [best, second] = Object.entries(score).sort((a, b) => b[1] - a[1]);
+  return best[1] >= 5 && best[1] >= second[1] * 1.3 ? best[0] : null;   // not sure → keep the current setting
+}
+function applySongLang() {
+  if (!S.v || !S.entries.length) return;
+  if (!S.v.lang) {
+    const d = detectLang(S.entries.filter(e => e.text).map(e => e.text));
+    if (!d) return;
+    S.v.lang = d; saveLib();
+  }
+  if (settings.lang !== S.v.lang) {
+    settings.lang = S.v.lang; saveSettings();
+    toast(`Idioma da música: ${LANG_NAME[S.v.lang] || S.v.lang}`);
+  }
 }
 function saveSong() {
   const v = S.v; v.lrc = toLRC(S.entries); v.offset = S.offset; v.updated = Date.now(); saveLib();
@@ -875,7 +923,18 @@ function syncUndo() {
 }
 
 /* ================= game ================= */
+/* Japanese / Chinese have no spaces between words: split with the browser's word segmenter (Intl.Segmenter).
+   Korean uses spaces, so it goes through the normal path. */
+const NO_SPACE_SCRIPT = /[぀-ヿ㐀-鿿]/;
+const segmenters = {};
 function tokenize(text) {
+  if (NO_SPACE_SCRIPT.test(text) && typeof Intl !== 'undefined' && Intl.Segmenter) {
+    const loc = settings.lang === 'zh' ? 'zh' : 'ja';
+    const seg = segmenters[loc] || (segmenters[loc] = new Intl.Segmenter(loc, { granularity: 'word' }));
+    return [...seg.segment(text)].map(s => s.isWordLike
+      ? { raw: s.segment, pre: '', core: s.segment, post: '', word: /\p{L}/u.test(s.segment), cjk: NO_SPACE_SCRIPT.test(s.segment) }
+      : { raw: s.segment, ws: true });
+  }
   return text.split(/(\s+)/).filter(s => s !== '').map(raw => {
     if (/^\s+$/.test(raw)) return { raw, ws: true };
     const m = raw.match(/^([^\p{L}\p{N}]*)(.*?)([^\p{L}\p{N}]*)$/u);
@@ -888,7 +947,7 @@ function buildLines() {
   for (let i = 0; i < E.length; i++) {
     if (!E[i].text) continue;
     const tokens = tokenize(E[i].text);
-    tokens.forEach(tk => { if (tk.word && tk.core.length >= 2) { const k = norm(tk.core); if (k && !seen.has(k)) seen.set(k, tk.core); } });
+    tokens.forEach(tk => { if (tk.word && tk.core.length >= (tk.cjk ? 1 : 2)) { const k = norm(tk.core); if (k && !seen.has(k)) seen.set(k, tk.core); } });
     // entry: the LRC entry this verse comes from, so its timing can be edited and saved later
     lines.push({ entry: E[i], t: E[i].t, end: lineEnd(E, i, dur), text: E[i].text, tokens, blanks: [], blankMap: {}, tr: trOf(E[i].text) });
   }
@@ -1008,10 +1067,12 @@ function buildGame() {
   lines.forEach(line => {
     if (diff === 'facil' && Math.random() > 0.6) return;
     const words = line.tokens.map((tk, i) => ({ tk, i })).filter(x => x.tk.word);
-    let cand = words.filter(x => x.tk.core.length >= 3 && !STOP.has(norm(x.tk.core)));
-    if (!cand.length) cand = words.filter(x => x.tk.core.length >= 2);
+    // Japanese words are short (1–3 characters, e.g. 君 / 声 / 聞こえる); particles (は / が / を…) are in STOP
+    let cand = words.filter(x => x.tk.core.length >= (x.tk.cjk ? 1 : 3) && !STOP.has(norm(x.tk.core)));
+    if (!cand.length) cand = words.filter(x => x.tk.core.length >= (x.tk.cjk ? 1 : 2));
     if (!cand.length) return;
-    cand = shuffle(cand).sort((a, b) => (b.tk.core.length > 3) - (a.tk.core.length > 3));
+    const long = x => x.tk.core.length >= (x.tk.cjk ? 2 : 4);   // prefer meatier words
+    cand = shuffle(cand).sort((a, b) => long(b) - long(a));
     const count = diff === 'dificil' && words.length >= 5 ? 2 : 1;
     const pick = [];
     for (const c of cand) { if (pick.length >= count) break; if (!pick.some(p => Math.abs(p.i - c.i) < 3)) pick.push(c); }
@@ -1423,7 +1484,7 @@ function aiErrorText(e) {
   }
   return 'Não foi possível concluir agora. Tente de novo em instantes.';
 }
-const LANG_NAME = { en: 'inglês', es: 'espanhol', fr: 'francês', it: 'italiano', de: 'alemão', pt: 'português' };
+const LANG_NAME = { en: 'inglês', es: 'espanhol', fr: 'francês', it: 'italiano', de: 'alemão', pt: 'português', ja: 'japonês', ko: 'coreano' };
 const songContext = () => {
   const lines = S.entries.filter(e => e.text).map(e => e.text);
   return `Música: "${(S.v && S.v.title) || ''}"${S.v && S.v.author ? ' — ' + S.v.author : ''}\nLetra completa (para contexto):\n${lines.join('\n')}`;
@@ -1911,7 +1972,8 @@ function sheetSettings() {
     ${inSong ? `<div class="group"><div class="grow"><span>Sincronia desta música<small>Use − se a letra aparece antes da voz</small></span><div class="stepper"><button data-a="offm">−</button><span id="offVal">${(S.offset >= 0 ? '+' : '') + S.offset.toFixed(1)}s</span><button data-a="offp">+</button></div></div></div>` : ''}
 
     <div class="grouplabel">Idioma</div>
-    <div class="field"><label>Idioma das músicas</label>${seg('lang', [['en', 'EN'], ['es', 'ES'], ['fr', 'FR'], ['it', 'IT'], ['de', 'DE'], ['pt', 'PT']], settings.lang)}</div>
+    <div class="field"><label>${inSong ? 'Idioma desta música' : 'Idioma das músicas'}</label>${seg('lang', [['en', 'EN'], ['es', 'ES'], ['fr', 'FR'], ['it', 'IT'], ['de', 'DE'], ['ja', 'JA'], ['ko', 'KO'], ['pt', 'PT']], settings.lang)}
+      <p class="caption" style="margin-top:6px">${inSong ? 'Detectado automaticamente pela letra. Corrija aqui se estiver errado.' : 'Cada música tem o idioma detectado automaticamente pela letra.'}</p></div>
     <div class="group">
       ${swRow('Tradução para português', 'translate', 'Mostrada embaixo do verso que está tocando')}
       ${swRow('Sons de acerto', 'sounds')}
@@ -1959,6 +2021,8 @@ function applySetting(k, v, group) {
   if (k === 'mode' && S.phase === 'play') { applyMode(); renderGame(); }
   if (k === 'pace' && S.phase === 'play') { S.waiting = false; setRing(0); player.playVideo(); renderGame(); }
   if (k === 'speed' && playerReady) { player.setPlaybackRate(v); setSpeedLabels(); }
+  if (k === 'lang' && document.body.dataset.view === 'song' && S.v) { S.v.lang = v; saveLib(); }   // manual correction sticks to this song
+  if (k === 'lang' && S.phase === 'play') { S.lines.forEach(l => { l.tr = null; l.trFail = false; translateLine(l); }); renderGame(); }
   if (k === 'lang' && S.phase === 'karaoke') { S.lines.forEach(l => { l.tr = null; l.trFail = false; }); renderKaraoke(); translateAllKaraoke(); }
   if (S.phase === 'ready') renderReady();
 }

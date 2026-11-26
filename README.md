@@ -70,6 +70,15 @@ A música toca e a **letra inteira rola sozinha**, com o verso cantado em destaq
 - **Múltipla escolha** (padrão): 4 opções em formato de **cruz**. No PC, as setas ↑ ← → ↓ ou as teclas 1 a 4 escolhem a opção.
 - **Digitando**: pequenos erros de digitação são aceitos em palavras de 5 letras ou mais, e maiúsculas/acentos não importam.
 
+### Idiomas
+
+Funciona com músicas em **inglês, espanhol, francês, italiano, alemão, japonês e coreano** (e português, sem tradução).
+
+- **Detecção automática:** quando a letra carrega, o app descobre o idioma pela própria letra (alfabeto japonês ou coreano, ou as palavras mais comuns de cada idioma) e guarda **por música**. Ao abrir a música, a tradução já usa o idioma certo. Se errar, corrija em ⚙ → *Idioma desta música*, e a correção fica salva para aquela música.
+- **Japonês:** como não há espaço entre as palavras, o app separa as palavras com o segmentador do próprio navegador (`Intl.Segmenter`). As lacunas podem ser palavras de 1 caractere (君, 声, 夜), e as partículas gramaticais (の, が, は, を…) nunca viram lacuna. Para responder, o modo *Múltipla escolha* é o mais prático; digitando, use o teclado japonês.
+- **Coreano:** usa espaços entre as palavras, então funciona como os idiomas ocidentais.
+- **Sugestões na busca:** a aba Buscar mostra *Sucessos para praticar*, separados por idioma (🇺🇸 🇪🇸 🇫🇷 🇩🇪 🇯🇵 🇰🇷 🇮🇹). Todas as sugestões têm letra sincronizada disponível (conferido em 25/11/2026).
+
 ### Dificuldade
 
 - **Fácil:** lacunas em cerca de 60% das frases.
@@ -174,7 +183,7 @@ Quando a letra encontrada não bate com o vídeo (clipe com introdução, versã
 - Para letra de música, quase sempre cai na **tradução automática**. **Não é uma tradução feita por alguém para aquela música.**
 - **Qualidade:** boa para entender o sentido geral, mas literal. Gírias, expressões idiomáticas e metáforas podem sair erradas ou estranhas.
 - **Limite gratuito:** cerca de 5.000 caracteres por dia (umas 3 músicas novas por dia). As traduções ficam guardadas no aparelho, então repetir uma música não gasta o limite.
-- O idioma de origem é escolhido em ⚙ → *Idioma das músicas*. O destino é sempre português (PT-BR).
+- O idioma de origem é detectado pela letra de cada música (veja [Idiomas](#idiomas)). O destino é sempre português (PT-BR).
 
 ### Melhorar uma tradução (✎)
 
