@@ -766,6 +766,8 @@ function renderReady() {
     $('#qsGo').onclick = sheetQuickSync;
     $('#qsDismiss').onclick = () => { delete S.v.syncHint; saveLib(); renderReady(); };
   } else hint.innerHTML = '';
+  $('#songTrBtn').textContent = S.v && S.v.aiSong ? '✨ Ver a tradução' : '✨ Traduzir a música';
+  $('#songTrBtn').classList.toggle('hidden', settings.lang === 'pt');
   $('#readyInfo').textContent = (settings.pace === 'flow'
     ? 'A música não para: responda enquanto o verso toca. Erros só aparecem no final.'
     : 'O vídeo pausa no fim de cada frase. Acertou, continua. Errou, a frase toca de novo.')
@@ -1385,6 +1387,7 @@ async function fetchGoogle(text, lang) {
 function setTranslation(text, lang, tr, mine) {
   const key = trKey(text, lang);
   if (mine) lib.trOverride[key] = tr; else delete lib.trOverride[key];
+  delete lib.aiNotes[key];   // a new choice replaces any AI translation/note (the AI flow sets its note right after)
   if (lang === settings.lang) S.lines.forEach(l => { if (l.text === text) { l.tr = tr; l.trFail = false; } });
   lib.phrases.forEach(p => { if (p.text === text && (p.lang || 'en') === lang) p.tr = tr; });
   saveLib();
@@ -1461,29 +1464,131 @@ function sheetNoKey(after) {
   });
   setTimeout(() => $('#aiKeyQuick') && $('#aiKeyQuick').focus(), 100);
 }
+/* lib.aiNotes[key] exists (possibly '') when the verse's current translation came from the AI */
+const hasAiTr = (text, lang) => { const k = trKey(text, lang); return (k in lib.aiNotes) && !!lib.trOverride[k]; };
 function sheetAiTr(text, lang, after) {
-  if (!settings.claudeKey) return sheetNoKey(() => sheetAiTr(text, lang, after));
-  const key = trKey(text, lang), before = lib.trOverride[key] || null;
+  const key = trKey(text, lang);
+  const cached = hasAiTr(text, lang);
+  if (!cached && !settings.claudeKey) return sheetNoKey(() => sheetAiTr(text, lang, after));
+  let before = null;
   const wasPlaying = inSession() && playerReady && player.getPlayerState() === YT.PlayerState.PLAYING;
   if (wasPlaying) player.pauseVideo();
   const finish = () => { closeSheet(); if (wasPlaying) player.playVideo(); if (after) after(); };
   openSheet(`<h3>✨ Tradução inteligente</h3>
     <div class="adjline">${esc(text)}</div>
-    <div id="aiTrBox" class="aibox"><span class="trwait">Traduzindo o verso…</span></div>
-    <div class="sheetbtns"><button class="btn" data-a="undo" id="aiUndo" disabled>Desfazer</button><button class="btn primary" data-a="ok">OK</button></div>`, {
+    <div id="aiTrBox" class="aibox"></div>
+    <div class="sheetbtns"><button class="btn" data-a="again" id="aiAgain">Traduzir de novo</button><button class="btn hidden" data-a="undo" id="aiUndo">Desfazer</button><button class="btn primary" data-a="ok">OK</button></div>`, {
     ok: finish,
-    undo: () => { if (before) setTranslation(text, lang, before, true); else setTranslation(text, lang, trCache[key] || null, false); delete lib.aiNotes[key]; saveLib(); toast('Tradução anterior de volta'); finish(); }
+    again: () => run(),
+    undo: () => {
+      if (before) setTranslation(text, lang, before, true); else setTranslation(text, lang, trCache[key] || null, false);
+      saveLib(); toast('Tradução anterior de volta'); finish();
+    }
   }, () => { if (wasPlaying) player.playVideo(); if (after) after(); });
-  aiTranslateVerse(text).then(({ tr, note }) => {
+  const show = (tr, note, label) => {
     const box = $('#aiTrBox'); if (!box) return;
-    setTranslation(text, lang, tr, true);
-    if (note) lib.aiNotes[key] = note; else delete lib.aiNotes[key];
-    saveLib();
-    box.innerHTML = `<div class="aitr">${esc(tr)}</div>${note ? `<div class="ainote"><b>Entenda:</b> ${esc(note)}</div>` : ''}<small class="aisaved">Salva para este verso</small>`;
-    $('#aiUndo').disabled = false;
+    box.innerHTML = `<div class="aitr">${esc(tr)}</div>${note ? `<div class="ainote"><b>Entenda:</b> ${esc(note)}</div>` : ''}<small class="aisaved">${label}</small>`;
+  };
+  const run = () => {
+    const box = $('#aiTrBox'); if (!box) return;
+    if (!settings.claudeKey) { box.innerHTML = `<div class="ainote err">${esc(aiErrorText({ code: 'nokey' }))}</div>`; return; }
+    before = lib.trOverride[key] || null;
+    box.innerHTML = '<span class="trwait">Traduzindo o verso…</span>';
+    $('#aiAgain').disabled = true; $('#aiUndo').classList.add('hidden');
+    aiTranslateVerse(text).then(({ tr, note }) => {
+      setTranslation(text, lang, tr, true);
+      lib.aiNotes[key] = note || '';
+      saveLib();
+      show(tr, note, 'Salva para este verso');
+      $('#aiUndo').classList.remove('hidden');
+      $('#aiAgain').disabled = false;
+    }).catch(e => {
+      const b = $('#aiTrBox'); if (b) b.innerHTML = `<div class="ainote err">${esc(aiErrorText(e))}</div>`;
+      const a = $('#aiAgain'); if (a) a.disabled = false;
+    });
+  };
+  if (cached) show(lib.trOverride[key], lib.aiNotes[key], 'Tradução inteligente salva para este verso'); else run();
+}
+
+/* "✨ Traduzir a música toda": one request translates every distinct verse (with notes) and applies it to all lines */
+const AI_SONG_SYSTEM = `Você ajuda brasileiros a aprender idiomas com músicas. Traduza para o português do Brasil cada verso numerado da letra, de forma natural e fiel ao sentido na música (não palavra por palavra): gírias, expressões idiomáticas, duplo sentido e referências culturais devem virar o equivalente que um brasileiro entenderia. Mantenha coerência entre os versos, já que você vê a música inteira.
+Para cada verso, devolva o número (n), a tradução (tr) e uma nota (note) com uma ou duas frases curtas explicando gíria, expressão ou referência daquele verso; deixe note vazia ("") quando não houver nada a explicar. Traduza todos os versos, na ordem.`;
+const AI_SONG_SCHEMA = {
+  type: 'object',
+  properties: {
+    lines: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { n: { type: 'integer' }, tr: { type: 'string' }, note: { type: 'string' } },
+        required: ['n', 'tr', 'note'],
+        additionalProperties: false
+      }
+    }
+  },
+  required: ['lines'],
+  additionalProperties: false
+};
+const songVerses = () => [...new Set(S.entries.filter(e => e.text).map(e => e.text))];
+async function aiTranslateSong() {
+  const ai = await getAI();
+  const verses = songVerses();
+  const msg = await ai.messages.create({
+    model: settings.aiModel,
+    max_tokens: 16000,
+    system: AI_SONG_SYSTEM,
+    output_config: { format: { type: 'json_schema', schema: AI_SONG_SCHEMA } },
+    messages: [{ role: 'user', content: `Música: "${(S.v && S.v.title) || ''}"${S.v && S.v.author ? ' · ' + S.v.author : ''}\n\nVersos:\n${verses.map((v, i) => `${i + 1}. ${v}`).join('\n')}` }]
+  });
+  if (msg.stop_reason === 'refusal') { const e = new Error('refusal'); e.code = 'refusal'; throw e; }
+  if (msg.stop_reason === 'max_tokens') { const e = new Error('Letra longa demais para traduzir de uma vez'); e.code = 'toolong'; throw e; }
+  const data = JSON.parse(textOf(msg));
+  let done = 0;
+  (data.lines || []).forEach(({ n, tr, note }) => {
+    const text = verses[n - 1];
+    if (!text || !tr || !tr.trim()) return;
+    setTranslation(text, settings.lang, tr.trim(), true);
+    lib.aiNotes[trKey(text, settings.lang)] = (note || '').trim();
+    done++;
+  });
+  S.v.aiSong = done >= verses.length * 0.8;   // nearly all verses covered
+  saveLib();
+  return { done, total: verses.length };
+}
+function songTrListHTML() {
+  return songVerses().map(text => {
+    const k = trKey(text, settings.lang), tr = lib.trOverride[k] || trCache[k] || '', note = lib.aiNotes[k];
+    return `<li><span class="so">${esc(text)}</span>${tr ? `<span class="st">${esc(tr)}</span>` : ''}${note ? `<span class="sn"><b>Entenda:</b> ${esc(note)}</span>` : ''}</li>`;
+  }).join('');
+}
+function sheetTranslateSong(force = false) {
+  const v = S.v; if (!v) return;
+  if (!S.entries.length) { toast('Carregue a letra da música primeiro'); return; }
+  if (settings.lang === 'pt') { toast('A música já está em português'); return; }
+  const ready = !force && v.aiSong;
+  if (!ready && !settings.claudeKey) return sheetNoKey(() => sheetTranslateSong(force));
+  const wasPlaying = inSession() && playerReady && player.getPlayerState() === YT.PlayerState.PLAYING;
+  if (wasPlaying) player.pauseVideo();
+  const close = () => { closeSheet(); if (wasPlaying) player.playVideo(); if (S.phase === 'play') renderGame(); if (S.phase === 'karaoke') S.lines.forEach((_, i) => paintKarLine(i)); if (S.phase === 'ready') renderReady(); };
+  const n = songVerses().length;
+  openSheet(`<h3>✨ Tradução da música</h3>
+    <p class="caption center-text" style="margin-top:0">${esc(v.title || '')}${v.author ? ' · ' + esc(v.author) : ''}</p>
+    <div id="songTrBox">${ready ? `<ul class="songtr">${songTrListHTML()}</ul>` : `<div class="aibox"><span class="trwait">Traduzindo ${n} versos com o contexto da música toda…</span></div>`}</div>
+    <div class="sheetbtns"><button class="btn" data-a="again" id="stAgain" ${ready ? '' : 'disabled'}>Traduzir de novo</button><button class="btn primary" data-a="ok">Fechar</button></div>
+    <p class="caption center-text">As traduções ficam salvas e aparecem durante o jogo e no karaokê.</p>`, {
+    ok: close,
+    again: () => { closeSheet(); sheetTranslateSong(true); }
+  }, close);
+  if (ready) return;
+  aiTranslateSong().then(({ done, total }) => {
+    const box = $('#songTrBox'); if (!box) return;
+    box.innerHTML = `<div class="aisaved" style="margin:0 0 10px;text-align:center">${done} de ${total} versos traduzidos</div><ul class="songtr">${songTrListHTML()}</ul>`;
+    const a = $('#stAgain'); if (a) a.disabled = false;
+    if (S.phase === 'ready') renderReady();
   }).catch(e => {
-    const box = $('#aiTrBox'); if (!box) return;
-    box.innerHTML = `<div class="ainote err">${esc(aiErrorText(e))}</div>${e && e.code === 'nokey' ? '' : ''}`;
+    const box = $('#songTrBox'); if (!box) return;
+    box.innerHTML = `<div class="aibox"><div class="ainote err">${esc(e && e.code === 'toolong' ? 'A letra é longa demais para traduzir de uma vez. Use o ✨ em cada verso.' : aiErrorText(e))}</div></div>`;
+    const a = $('#stAgain'); if (a) a.disabled = false;
   });
 }
 
@@ -1864,7 +1969,8 @@ function sheetSongMore() {
     <div class="group">
       <button class="grow" data-a="pl">${icon('addlist')}<span>Adicionar à playlist</span></button>
       <button class="grow" data-a="yt">${icon('ext')}<span>Abrir no YouTube</span></button>
-      ${has ? `<button class="grow" data-a="explain"><span class="aiico">✨</span><span>Entender a música<small>Resumo, sentido e expressões da letra</small></span></button>` : ''}
+      ${has ? `<button class="grow" data-a="songtr"><span class="aiico">✨</span><span>${v.aiSong ? 'Ver a tradução da música' : 'Traduzir a música toda'}<small>Todos os versos, com as gírias explicadas</small></span></button>
+      <button class="grow" data-a="explain"><span class="aiico">✨</span><span>Entender a música<small>Resumo, sentido e expressões da letra</small></span></button>` : ''}
     </div>
     <div class="grouplabel">Letra</div>
     <div class="group">
@@ -1879,6 +1985,7 @@ function sheetSongMore() {
     kar: () => { closeSheet(); startKaraoke(); },
     quick: () => { closeSheet(); sheetQuickSync(); },
     explain: () => sheetExplain(),
+    songtr: () => sheetTranslateSong(),
     resync: () => { closeSheet(); if (inSession()) quitGame(); startSync(S.entries.filter(e => e.text).map(e => e.text)); },
     edit: () => sheetEditLRC(),
     change: () => { closeSheet(); if (inSession()) quitGame(); S.phase = 'lyrics'; showPane('pLyrics'); prefillLyrics(); }
@@ -1995,6 +2102,8 @@ $('#gAdj').onclick = () => sheetAdjustVerse(S.cur);
 
 $('#karBtn').onclick = startKaraoke;
 $('#explainBtn').onclick = () => sheetExplain();
+$('#songTrBtn').onclick = () => sheetTranslateSong();
+$('#kAiSong').onclick = () => sheetTranslateSong();
 $('#kQuit').onclick = confirmQuit;
 $('#kSet').onclick = sheetSettings;
 $('#kSpeed').onclick = cycleSpeed;
